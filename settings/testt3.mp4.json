@@ -1,1 +1,1 @@
-{"zone_x": 0.56, "zone_y": 0.43, "zone_w": 0.12, "zone_h": 0.17, "padding": 119, "angle_threshold": 50, "hip_ratio": 0.4}
+{"zone_x": 0.46, "zone_y": 0.43, "zone_w": 0.07, "zone_h": 0.17, "padding": 119, "angle_threshold": 120, "hip_ratio": 0.4, "extension_threshold": 0.85, "detection_mode": "AI", "vis_alert_only": true, "vis_skeleton": true, "vis_bbox": true, "vis_class_label": true, "vis_zones": false, "vis_safe_line": false, "vis_wrist_text": true, "vis_wrist_dot": true}
