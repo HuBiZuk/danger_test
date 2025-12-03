@@ -1,1 +1,81 @@
-{"zone_x": 0.46, "zone_y": 0.44, "zone_w": 0.07, "zone_h": 0.12, "padding": 119, "angle_threshold": 50, "hip_ratio": 0.4, "extension_threshold": 0.85, "detection_mode": "AI", "vis_alert_only": true, "vis_skeleton": false, "vis_bbox": true, "vis_class_label": true, "vis_zones": false, "vis_safe_line": false, "vis_wrist_text": true, "vis_wrist_dot": true}
+{
+    "zone_x": 0.46,
+    "zone_y": 0.44,
+    "zone_w": 0.07,
+    "zone_h": 0.12,
+    "padding": 119,
+    "angle_threshold": 50,
+    "hip_ratio": 0.4,
+    "extension_threshold": 0.85,
+    "detection_mode": "AI",
+    "vis_alert_only": true,
+    "vis_skeleton": false,
+    "vis_bbox": true,
+    "vis_class_label": true,
+    "vis_zones": false,
+    "vis_safe_line": false,
+    "vis_wrist_text": true,
+    "vis_wrist_dot": true,
+    "zones": [
+        {
+            "points": [
+                [
+                    0.4583333333333333,
+                    0.44666666666666666
+                ],
+                [
+                    0.525,
+                    0.44
+                ],
+                [
+                    0.5283333333333333,
+                    0.58
+                ],
+                [
+                    0.4583333333333333,
+                    0.5711111111111111
+                ],
+                [
+                    0.45666666666666667,
+                    0.43777777777777777
+                ]
+            ],
+            "active": true
+        },
+        {
+            "points": [
+                [
+                    1.1791666666666667,
+                    0.9366666666666666
+                ],
+                [
+                    1.2725,
+                    0.9255555555555556
+                ],
+                [
+                    1.2775,
+                    1.0966666666666667
+                ],
+                [
+                    1.1825,
+                    1.09
+                ],
+                [
+                    1.1791666666666667,
+                    0.9322222222222222
+                ]
+            ],
+            "active": false
+        }
+    ],
+    "warning_distance": 30,
+    "vis_options": {
+        "alert_only": false,
+        "bbox": true,
+        "label": true,
+        "skeleton": true,
+        "zones": true,
+        "wrist_dot": true,
+        "text": true
+    }
+}

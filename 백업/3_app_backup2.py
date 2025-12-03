@@ -10,10 +10,10 @@ import time
 from ultralytics import YOLO
 
 # --- [초기 설정] 폴더 생성 ---
-if not os.path.exists('videos'):
-    os.makedirs('videos')
-if not os.path.exists('settings'):
-    os.makedirs('settings')
+if not os.path.exists('../videos'):
+    os.makedirs('../videos')
+if not os.path.exists('../settings'):
+    os.makedirs('../settings')
 
 
 # --- [함수] 각도 계산 ---
@@ -29,7 +29,7 @@ def calculate_angle(a, b, c):
 
 # --- [함수] 설정 로드 / 저장 ---
 def load_settings(video_name):
-    json_path = os.path.join('settings', f"{video_name}.json")
+    json_path = os.path.join('../settings', f"{video_name}.json")
     default_settings = {
         'zone_x': 0.4, 'zone_y': 0.5, 'zone_w': 0.15, 'zone_h': 0.25,
         'padding': 50, 'angle_threshold': 120, 'hip_ratio': 0.2,
@@ -42,7 +42,7 @@ def load_settings(video_name):
 
 
 def save_settings(video_name, settings):
-    json_path = os.path.join('settings', f"{video_name}.json")
+    json_path = os.path.join('../settings', f"{video_name}.json")
     with open(json_path, 'w') as f:
         json.dump(settings, f)
 
@@ -193,7 +193,7 @@ with st.sidebar:
     if uploaded_file is not None:
         file_ext = os.path.splitext(uploaded_file.name)[1]
         safe_filename = f"video_{int(time.time())}{file_ext}"
-        save_path = os.path.join("videos", safe_filename)
+        save_path = os.path.join("../videos", safe_filename)
 
         with open(save_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
@@ -201,7 +201,7 @@ with st.sidebar:
         st.rerun()
 
     st.markdown("---")
-    video_list = [f for f in os.listdir("videos") if f.endswith(('.mp4', '.avi'))]
+    video_list = [f for f in os.listdir("../videos") if f.endswith(('.mp4', '.avi'))]
     selected_video = None
     if video_list:
         selected_video = st.selectbox("🎥 분석할 영상 선택", video_list)
@@ -210,18 +210,18 @@ with st.sidebar:
 
 # --- 메인 로직 ---
 if selected_video:
-    video_path = os.path.join("videos", selected_video)
+    video_path = os.path.join("../videos", selected_video)
     current_settings = load_settings(selected_video)
 
     # 모델 로드
-    if os.path.exists('model.pkl'):
-        custom_model = joblib.load('model.pkl')
+    if os.path.exists('../model.pkl'):
+        custom_model = joblib.load('../model.pkl')
     else:
         st.error("model.pkl 파일이 없습니다.")
         st.stop()
 
     try:
-        yolo_model = YOLO('yolov8n-pose.pt')
+        yolo_model = YOLO('../yolov8n-pose.pt')
     except:
         st.error("YOLO 모델 로드 실패")
         st.stop()
