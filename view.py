@@ -1,4 +1,6 @@
-import streamlit as st
+# view.py
+
+import streamlit as st  # ⚠️ 이 줄이 가장 상단에 있어야 함!
 import cv2
 import time
 import os
@@ -36,10 +38,10 @@ def render_sidebar():
                 f.write(upload_file.getbuffer())
             st.success("업로드 완료")
             time.sleep(1)
-            st.rerun()
+            st.experimental_rerun()
 
         video_list = [f for f in os.listdir("videos") if f.endswith((".mp4", ".avi"))]
-        video_list.sort(reverse=True)
+        video_list.sort()
 
         if video_list:
             return st.selectbox("영상 선택", video_list)
@@ -50,7 +52,6 @@ def render_sidebar():
 # 구역 관리 탭
 # ===============================================================
 def render_zone_tab(sel_v, curr_settings, video_path):
-
     # 세션 초기화
     if "draw_mode_state" not in st.session_state:
         st.session_state["draw_mode_state"] = "transform"
@@ -65,7 +66,7 @@ def render_zone_tab(sel_v, curr_settings, video_path):
         if st.button("➕ 새 구역 그리기"):
             st.session_state["draw_mode_state"] = "polygon"
             st.session_state["cv_key"] += 1
-            st.rerun()
+            st.experimental_rerun()
 
     with c2:
         if st.button("🗑️ 전체 삭제"):
@@ -73,7 +74,7 @@ def render_zone_tab(sel_v, curr_settings, video_path):
             save_settings(sel_v, curr_settings)
             st.session_state["draw_mode_state"] = "transform"
             st.session_state["cv_key"] += 1
-            st.rerun()
+            st.experimental_rerun()
 
     cw, ch = 600, 450
 
@@ -95,20 +96,22 @@ def render_zone_tab(sel_v, curr_settings, video_path):
         st.session_state["last_vid"] = sel_v
 
     # ===============================================================
-    # 기존 zones → canvas object로 복원
+    # 기존 zones 로드
     # ===============================================================
     initial_drawing = {"version": "4.4.0", "objects": []}
 
     for z in curr_settings["zones"]:
         pts = z["points"]
-        if not pts:
-            continue
+        if not pts: continue
+
+        # 활성 상태에따라 색상 변경 (활성: 빨강, 비활성: 회색)
+        is_active = z.get("active", True)
+        stroke_color = "red" if is_active else "gray"
+        fill_color = "rgba(255,0,0,0.3)" if is_active else "rgba(128,128,128,0.1)"
 
         poly = np.array(pts) * [cw, ch]
-
         min_x = np.min(poly[:, 0])
         min_y = np.min(poly[:, 1])
-
         path_cmds = [["M", poly[0][0] - min_x, poly[0][1] - min_y]]
         for p in poly[1:]:
             path_cmds.append(["L", p[0] - min_x, p[1] - min_y])
@@ -117,15 +120,13 @@ def render_zone_tab(sel_v, curr_settings, video_path):
         initial_drawing["objects"].append({
             "type": "path",
             "path": path_cmds,
-            "fill": "rgba(255, 0, 0, 0.3)",
-            "stroke": "red",
+            "fill": fill_color,
+            "stroke": stroke_color,
             "strokeWidth": 2,
             "left": min_x,
             "top": min_y,
             "originX": "left",
-            "originY": "top",
-            "scaleX": 1,
-            "scaleY": 1
+            "originY": "top"
         })
 
     # ===============================================================
@@ -145,7 +146,7 @@ def render_zone_tab(sel_v, curr_settings, video_path):
     )
 
     # ===============================================================
-    # 🔥 첫 저장 시 좌표 튐 문제 완전 해결 (Fabric.js 원리 그대로 적용)
+    # 🔥 첫 저장 시 좌표 튐 문제 해결 (originX/Y에 따른 Path 좌표 해석)
     # ===============================================================
     if st.button("💾 구역 저장 (적용)", type="primary", use_container_width=True):
 
@@ -155,36 +156,62 @@ def render_zone_tab(sel_v, curr_settings, video_path):
             for obj in canvas.json_data["objects"]:
 
                 points = []
-
                 # ------------------------------------
-                # Case A: 새로 그린 polygon
+                # Case A: 새로 그린 polygon (구역설정 특어진 원인: path로 그려지는데 plygon 좌표로 그려서 좌표 안맞음)
                 # ------------------------------------
+                """
+                # 삭제
                 if obj["type"] == "polygon":
+                    st.write("--- 새로 그린 Polygon 객체 디버깅 시작 ---")
+                    st.json(obj)  # obj 딕셔너리의 전체 내용을 JSON 형태로 출력
+                    st.write("--- 새로 그린 Polygon 객체 디버깅 종료 ---")
+
                     left = obj["left"]
                     top = obj["top"]
                     scaleX = obj["scaleX"]
                     scaleY = obj["scaleY"]
-                    off_x = obj["pathOffset"]["x"]
-                    off_y = obj["pathOffset"]["y"]
 
                     for p in obj["points"]:
-                        abs_x = left + (p["x"] + off_x) * scaleX
-                        abs_y = top + (p["y"] + off_y) * scaleY
+                        # 현재로서는 가장 단순한 형태의 변환 로직을 유지.
+                        abs_x = left + p["x"]  # scaleX 곱하기 제거 상태 유지
+                        abs_y = top + p["y"]  # scaleY 곱하기 제거 상태 유지
                         points.append([abs_x / cw, abs_y / ch])
+                """
 
                 # ------------------------------------
-                # Case B: 로드된 path(불러온 도형)
+                # ✅ Path 객체 처리 (새로 그린 polygon도 이 타입으로 반환됨)
                 # ------------------------------------
-                elif obj["type"] == "path":
+                if obj["type"] == "path":  # ⚠️모든 도형은 이 블록에서 처리.
                     left = obj["left"]
                     top = obj["top"]
-                    scaleX = obj["scaleX"]
-                    scaleY = obj["scaleY"]
+                    scaleX = obj.get("scaleX", 1.0)  # scaleX, scaleY가 없을 경우 기본값 1.0
+                    scaleY = obj.get("scaleY", 1.0)  # (JSON에 있었지만, 안전하게 get으로 처리)
+
+                    # originX와 originY를 확인하여 좌표 해석 방식을 결정
+                    # 기본값은 'left', 'top'이며, 없으면 이렇게 가정
+                    origin_x = obj.get("originX", "left")
+                    origin_y = obj.get("originY", "top")
+
+                    # originX/Y가 'center'인 경우, path 좌표가 이미 절대 캔버스 좌표일 가능성이 높음
+                    # (JSON 분석 결과, 'center'일 때 path 좌표가 절대 좌표였음)
+                    is_path_coords_absolute = (origin_x == "center" and origin_y == "center")
 
                     for cmd in obj["path"]:
-                        if cmd[0] in ["M", "L"]:
-                            abs_x = left + cmd[1] * scaleX
-                            abs_y = top + cmd[2] * scaleY
+                        if cmd[0] in ["M", "L"]:  # Path 명령 중 이동(M) 또는 선(L)만 처리
+                            abs_x = 0
+                            abs_y = 0
+
+                            if is_path_coords_absolute:
+                                # origin이 'center'이고 path 좌표가 이미 절대값인 경우
+                                # left/top/scaleX/Y는 건드리지 않고 path 좌표를 직접 사용
+                                abs_x = cmd[1]
+                                abs_y = cmd[2]
+                            else:
+                                # origin이 'left'/'top'이거나 다른 경우, path 좌표는 left/top 기준 상대값
+                                # 우리가 initial_drawing에서 생성한 path 객체들이 이 경우에 해당
+                                abs_x = left + cmd[1] * scaleX
+                                abs_y = top + cmd[2] * scaleY
+
                             points.append([abs_x / cw, abs_y / ch])
 
                 if len(points) > 2:
@@ -195,9 +222,10 @@ def render_zone_tab(sel_v, curr_settings, video_path):
 
         st.session_state["draw_mode_state"] = "transform"
         st.session_state["cv_key"] += 1
-        st.rerun()
 
-    # ===============================================================
+        st.experimental_rerun()
+
+        # ===============================================================
     # 구역 목록 (삭제 즉시 반영 + 기존 기능 유지)
     # ===============================================================
     st.markdown("---")
@@ -214,24 +242,24 @@ def render_zone_tab(sel_v, curr_settings, video_path):
 
             with c2:
                 is_active = z.get("active", True)
-                changed = st.toggle("활성", value=is_active, key=f"act_{i}")
+                changed = st.checkbox("활성", value=is_active, key=f"act_{i}")
 
                 if changed != is_active:
                     curr_settings["zones"][i]["active"] = changed
                     save_settings(sel_v, curr_settings)
-                    st.rerun()
+                    st.experimental_rerun()
 
             with c3:
                 st.button(
                     "🗑️",
-                    key=f"delbtn_{i}",   # 🔥 key 충돌 방지
+                    key=f"delbtn_{i}",
                     on_click=delete_zone_callback,
                     args=(i, sel_v)
                 )
 
     if st.session_state.get("force_rerun"):
         st.session_state["force_rerun"] = False
-        st.rerun()
+        st.experimental_rerun()
 
 
 # ===============================================================
@@ -240,23 +268,42 @@ def render_zone_tab(sel_v, curr_settings, video_path):
 def render_sensitivity_tab(sel_v, curr_settings):
     st.subheader("경고/위험 판단 기준")
 
+    # 화재감지 체크박스
+    fire_check = st.checkbox("🔥 화재 / 연기 감지 모드 켜기", value=curr_settings.get("fire_check", False))
+
+    st.markdown("---")  # 구분선
+
+    # 판단모드 옵션 변경
+    mode_options = ["Algorithm", "AI", "OR", "AND"]
+
+    # 기존 설정 호환성 처리(기존Both 저장되있을시 AND로 처리
+    current_mode = curr_settings["detection_mode"]
+    if current_mode == "Both":
+        current_mode == "AND"
+    if current_mode not in mode_options:
+        current_mode = "Algorithm"
+
+    md = st.radio("판단 모드", mode_options,
+                  index=["Algorithm", "AI", "Both"].index(curr_settings["detection_mode"]),
+                  horizontal=True)
     wd = st.slider("⚠️ 경고 감지 거리", 0, 200, curr_settings.get("warning_distance", 30))
     et = st.slider("팔 뻗음 비율", 0.5, 1.0, curr_settings["extension_threshold"])
     at = st.slider("팔 각도 임계값", 90, 180, curr_settings["angle_threshold"])
-    md = st.radio("판단 모드", ["Algorithm", "AI", "Both"],
-                  index=["Algorithm", "AI", "Both"].index(curr_settings["detection_mode"]))
+    hr = st.slider("골반기준 손 높이 상한 비율", 0.0, 1.0, curr_settings.get("hip_ratio", 0.2), 0.05)
 
     if st.button("감도 저장"):
         curr_settings.update({
+            "fire_check": fire_check,
             "warning_distance": wd,
             "extension_threshold": et,
             "angle_threshold": at,
-            "detection_mode": md
+            "detection_mode": md,
+            "hip_ratio": hr
         })
         save_settings(sel_v, curr_settings)
         st.success("저장됨")
 
-    return wd, et, at, md
+    return wd, et, at, md, hr, fire_check
 
 
 # ===============================================================

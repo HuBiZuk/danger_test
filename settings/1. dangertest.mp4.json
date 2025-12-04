@@ -1,0 +1,43 @@
+{
+    "zones": [
+        {
+            "points": [
+                [
+                    0.2866666666666667,
+                    0.388888890546634
+                ],
+                [
+                    0.49833333333333335,
+                    0.36444444444444446
+                ],
+                [
+                    0.51,
+                    0.5844444593641502
+                ],
+                [
+                    0.30833333333333335,
+                    0.6733333542812031
+                ],
+                [
+                    0.2866666666666667,
+                    0.38666666817370765
+                ]
+            ],
+            "active": true
+        }
+    ],
+    "warning_distance": 30,
+    "angle_threshold": 130,
+    "hip_ratio": 0.2,
+    "extension_threshold": 0.85,
+    "detection_mode": "Algorithm",
+    "vis_options": {
+        "alert_only": true,
+        "bbox": true,
+        "label": true,
+        "skeleton": false,
+        "zones": false,
+        "wrist_dot": true,
+        "text": true
+    }
+}

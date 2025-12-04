@@ -1,0 +1,18 @@
+{
+    "zones": [],
+    "fire_check": true,
+    "warning_distance": 30,
+    "extension_threshold": 0.85,
+    "angle_threshold": 130,
+    "hip_ratio": 0.2,
+    "detection_mode": "Algorithm",
+    "vis_options": {
+        "alert_only": false,
+        "skeleton": true,
+        "zones": true,
+        "bbox": true,
+        "label": true,
+        "wrist_dot": true,
+        "text": true
+    }
+}
