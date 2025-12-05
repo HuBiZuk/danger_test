@@ -9,10 +9,20 @@ import streamlit as st # Streamlit을 사용하는 함수가 없더라도 @st.ca
 from ultralytics import YOLO
 from utils import get_distance, calculate_angle
 
+def get_device():
+    # 그래픽카드가 있으면 그래픽카드 사용
+    if torch.cuda.is_available():
+        return 0
+    else:
+        return 'cpu'
 
 @st.cache_resource
 def get_models():
     try:
+        # 그래픽카드 사용 유무 로그출력
+        device_status = "GPU (CUDA)" if torch.cuda.is_available() else "CPU"
+        print(f"모델 로딩중...(현재장치: {device_status})")
+
         # 모델 파일 경로 확인
         yolo_path = 'yolov8n-pose.pt'   # 다운로드 필요시 자동 다운로드됨 (Ultralytics 기능)
         fire_path = 'smoke_fire_model_hsy_v2.pt'
@@ -33,11 +43,12 @@ def get_models():
 
 
 def process_frame(frame, yolo_model, custom_model, fire_model, settings):
+    device = get_device() # 그래픽카드 사용유무
+
     # 분석용 리사이즈
     frame = cv2.resize(frame, (800, 600))
     h, w, _ = frame.shape
 
-    device = 0 if torch.cuda.is_available() else 'cpu'
 
     # 설정값 풀기
     zones = settings['zones']
@@ -60,8 +71,13 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
             cls_name =  fire_model.names[int(box.cls[0])]
 
             # 그리기(빨간색 박스)
-            cv2.rectangle(frame, (x1,y1),(x2,y2),(9,9,255),2)
+            cv2.rectangle(frame, (x1,y1),(x2,y2),(0,0,255),2)
             cv2.putText(frame,f"{cls_name} {conf:2f}", (x1,y1 -10), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0,0,255), 3)
+
+            # 화재 감지 시 화면에 경고 메세지 출력
+            if 'fire' in cls_name.lower():
+                cv2.putText(frame,"FIRE DETECTED!!!",(50, 100),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0,0,255), 3)
     # ---------------------------------------------------------
 
     results = yolo_model(frame, verbose=False, conf=0.25, device=device)
