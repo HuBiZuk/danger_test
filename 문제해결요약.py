@@ -15,6 +15,25 @@
     originX/Y가 center인 경우: abs_x = cmd[1], abs_y = cmd[2] (절대 좌표를 그대로 사용)
 그렇지 않은 경우 (기존에 initial_drawing으로 로드되는 path 객체): abs_x = left + cmd[1] * scaleX, abs_y = top + cmd[2] * scaleY (상대 좌표를 left/top 기준 스케일 적용하여 변환)
 
+[AI생성좌표 손뻗음 쓰러짐 감지 학습 모델]
+C:\Users\niceguysm\AppData\Local\Programs\Python\Python311\python.exe C:\Python_workspace\danger_test\백업\2-2_train_yolo.py
+데이터 로드 성공: 6000개 샘플
+모델 학습 중...
+
+📊 정확도: 91.75%
+
+[상세 리포트]
+              precision    recall  f1-score   support
+
+        Safe       0.89      0.88      0.89       432
+       Reach       0.87      0.88      0.88       387
+        Fall       0.99      0.99      0.99       381
+
+    accuracy                           0.92      1200
+   macro avg       0.92      0.92      0.92      1200
+weighted avg       0.92      0.92      0.92      1200
+
+💾 'model.pkl' 저장 완료! (8개 입력 특성)
 
 
 """

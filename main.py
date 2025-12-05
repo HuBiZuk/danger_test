@@ -18,11 +18,11 @@ utils.init_directories()
 
 st.title("🏛️ AI 전시품 보호 관리 시스템")
 
-# 2. 모델 로드
-yolo_model, custom_model, fire_model = processor.get_models()
+# 2. 사이드바 (파일 선택)
+sel_v, sel_model_name = view.render_sidebar()
 
-# 3. 사이드바 (파일 선택)
-sel_v = view.render_sidebar()
+# 3. 모델 로드
+yolo_model, custom_model, fire_model = processor.get_models(sel_model_name)
 
 if not sel_v or not yolo_model:
     st.warning("영상을 선택하거나 모델을 확인해주세요.")
@@ -48,16 +48,15 @@ with left_col:
     if selected_tab == "📝 구역 관리":
         view.render_zone_tab(sel_v, curr_settings, video_path)
     elif selected_tab == "⚡ 감도 설정":
-        # render_sensitivity_tab에서 리턴값을 받음
-        # live_settings에서 기본값을 설정하고, 정의된 경우만 업데이트
-        # 더 견고하게는 render_sensitivity_tab 내부에서 st.session_state에 값을 저장해야 함
-        wd, et, at, md, hr, fire_check = view.render_sensitivity_tab(sel_v, curr_settings)
+        wd, et, at, md, hr, fire_check, fall_check, fr = view.render_sensitivity_tab(sel_v, curr_settings)
         st.session_state['wd'] = wd
         st.session_state['et'] = et
         st.session_state['at'] = at
         st.session_state['md'] = md
         st.session_state['hr'] = hr
         st.session_state['fire_check'] = fire_check
+        st.session_state['fall_check'] = fall_check
+        st.session_state['fr'] = fr
 
     elif selected_tab == "👁️ 시각화 설정":
         # render_vis_tab에서 리턴값을 받아야 함
@@ -89,14 +88,16 @@ with right_col:
     # 실시간 설정을 반영하기 위한 딕셔너리 구성
     live_settings = curr_settings.copy()
 
-    # 각 탭의 위젯 값을 session_state에서 가져와 live_settings를 업데이트합니다.
-    # 이렇게 하면 탭이 선택되지 않아도 이전에 저장된 값을 사용할 수 있습니다.
     live_settings['warning_distance'] = st.session_state.get('wd', curr_settings.get("warning_distance", 30))
     live_settings['extension_threshold'] = st.session_state.get('et', curr_settings.get("extension_threshold", 0.7))
     live_settings['angle_threshold'] = st.session_state.get('at', curr_settings.get("angle_threshold", 120))
     live_settings['detection_mode'] = st.session_state.get('md', curr_settings.get("detection_mode", "Algorithm"))
     live_settings['hip_ratio'] = st.session_state.get('hr', curr_settings.get("hip_ratio", 0.2))
     live_settings['fire_check'] = st.session_state.get('fire_check', curr_settings.get("fire_check", False))
+    live_settings['fall_check'] = st.session_state.get('fall_check', curr_settings.get("fall_check", True))
+    live_settings['fall_ratio'] = st.session_state.get('fr', curr_settings.get("fall_ratio", 1.2))
+
+
 
 
     live_settings['vis_options'] = curr_settings.get('vis_options', {

@@ -1,10 +1,10 @@
 {
     "zones": [],
     "fire_check": true,
-    "warning_distance": 30,
+    "warning_distance": 56,
     "extension_threshold": 0.85,
     "angle_threshold": 130,
-    "hip_ratio": 0.2,
+    "hip_ratio": 0.45,
     "detection_mode": "Algorithm",
     "vis_options": {
         "alert_only": false,
@@ -14,5 +14,7 @@
         "label": true,
         "wrist_dot": true,
         "text": true
-    }
+    },
+    "fall_check": true,
+    "fall_ratio": 0.5
 }

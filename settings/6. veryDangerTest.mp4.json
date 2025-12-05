@@ -1,0 +1,20 @@
+{
+    "zones": [],
+    "fire_check": true,
+    "fall_check": true,
+    "fall_ratio": 1.2,
+    "warning_distance": 56,
+    "extension_threshold": 0.85,
+    "angle_threshold": 130,
+    "hip_ratio": 0.45,
+    "detection_mode": "Algorithm",
+    "vis_options": {
+        "alert_only": false,
+        "skeleton": true,
+        "zones": true,
+        "bbox": true,
+        "label": true,
+        "wrist_dot": true,
+        "text": true
+    }
+}

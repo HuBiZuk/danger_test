@@ -1,0 +1,46 @@
+{
+    "zones": [
+        {
+            "points": [
+                [
+                    0.6966666666666667,
+                    0.29777777777777775
+                ],
+                [
+                    0.8233333333333334,
+                    0.26222222222222225
+                ],
+                [
+                    0.8216666666666667,
+                    0.5444444444444444
+                ],
+                [
+                    0.6983333333333334,
+                    0.5244444444444445
+                ],
+                [
+                    0.6966666666666667,
+                    0.29777777777777775
+                ]
+            ],
+            "active": true
+        }
+    ],
+    "fire_check": true,
+    "fall_check": true,
+    "fall_ratio": 1.2,
+    "warning_distance": 56,
+    "extension_threshold": 0.85,
+    "angle_threshold": 130,
+    "hip_ratio": 0.45,
+    "detection_mode": "Algorithm",
+    "vis_options": {
+        "alert_only": false,
+        "skeleton": true,
+        "zones": true,
+        "bbox": true,
+        "label": true,
+        "wrist_dot": true,
+        "text": true
+    }
+}

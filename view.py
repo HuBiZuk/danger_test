@@ -40,12 +40,38 @@ def render_sidebar():
             time.sleep(1)
             st.experimental_rerun()
 
+        #-----------------------
+        # AI 모델 선택 박스
+        #----------------------
+        st.markdown("---")
+        st.subheader("AI모델 선택")
+
+        model_option = [
+            "yolo11n-pose.pt",  # Nano (빠름, 추천)
+            "yolo11s-pose.pt",  # Small
+            "yolo11m-pose.pt",  # Medium
+            "yolo11l-pose.pt",  # Large
+            "yolo11x-pose.pt",  # XLarge (매우 정밀)
+
+            # --- [YOLOv8] 기존 ---
+            "yolov8n-pose.pt",  # 기존 사용 모델
+        ]
+
+        # index=5 는 'yolov8n-pose.pt' 기본값으로 설정
+        select_model = st.selectbox("YOLO 포즈 모델", model_option, index=5)
+        st.caption("※ v11은 성능이 더 좋으며, v9/v10은 포즈 미지원")
+        st.markdown("---")
+        #---------------------------------------------------------
+
+        # 영상 목록 로드
         video_list = [f for f in os.listdir("videos") if f.endswith((".mp4", ".avi"))]
         video_list.sort()
 
         if video_list:
-            return st.selectbox("영상 선택", video_list)
-        return None
+            sel_video = st.selectbox("영상 선택", video_list)
+            return sel_video, select_model
+
+        return None, select_model
 
 
 # ===============================================================
@@ -275,25 +301,33 @@ def render_sensitivity_tab(sel_v, curr_settings):
 
     # 판단모드 옵션 변경
     mode_options = ["Algorithm", "AI", "OR", "AND"]
+    current_mode = curr_settings.get("detection_mode","Algorithm")
 
     # 기존 설정 호환성 처리(기존Both 저장되있을시 AND로 처리
-    current_mode = curr_settings["detection_mode"]
     if current_mode == "Both":
-        current_mode == "AND"
+        current_mode = "AND"
     if current_mode not in mode_options:
         current_mode = "Algorithm"
 
     md = st.radio("판단 모드", mode_options,
-                  index=["Algorithm", "AI", "Both"].index(curr_settings["detection_mode"]),
+                  index=mode_options.index(current_mode),
                   horizontal=True)
     wd = st.slider("⚠️ 경고 감지 거리", 0, 200, curr_settings.get("warning_distance", 30))
     et = st.slider("팔 뻗음 비율", 0.5, 1.0, curr_settings["extension_threshold"])
     at = st.slider("팔 각도 임계값", 90, 180, curr_settings["angle_threshold"])
     hr = st.slider("골반기준 손 높이 상한 비율", 0.0, 1.0, curr_settings.get("hip_ratio", 0.2), 0.05)
 
+    st.markdown("---")
+    fall_check = st.checkbox("🤸 낙상 감지 켜기", value=curr_settings.get("fall_check", True))
+    fr = st.slider("낙상 기울기 비율(낮을수록 민감", 0.5, 2.0,
+                   curr_settings.get("fall_ratio", 1.2), 0.1,
+                   disabled=not fall_check)
+
     if st.button("감도 저장"):
         curr_settings.update({
             "fire_check": fire_check,
+            "fall_check": fall_check,
+            "fall_ratio": fr,
             "warning_distance": wd,
             "extension_threshold": et,
             "angle_threshold": at,
@@ -303,7 +337,7 @@ def render_sensitivity_tab(sel_v, curr_settings):
         save_settings(sel_v, curr_settings)
         st.success("저장됨")
 
-    return wd, et, at, md, hr, fire_check
+    return wd, et, at, md, hr, fire_check, fall_check, fr
 
 
 # ===============================================================

@@ -17,17 +17,16 @@ def get_device():
         return 'cpu'
 
 @st.cache_resource
-def get_models():
+def get_models(model_name='yolov8n-pose.pt'):
     try:
         # 그래픽카드 사용 유무 로그출력
         device_status = "GPU (CUDA)" if torch.cuda.is_available() else "CPU"
         print(f"모델 로딩중...(현재장치: {device_status})")
 
         # 모델 파일 경로 확인
-        yolo_path = 'yolov8n-pose.pt'   # 다운로드 필요시 자동 다운로드됨 (Ultralytics 기능)
         fire_path = 'smoke_fire_model_hsy_v2.pt'
 
-        yolo = YOLO(yolo_path)
+        yolo = YOLO(model_name)
 
         # 화재모델 로드(파일이 없으면 경고 후 None)
         fire_model = YOLO(fire_path) if os.path.isfile(fire_path) else None
@@ -39,7 +38,7 @@ def get_models():
 
     except Exception as e:
         st.error(f"모델 로드 중 오류 발생: {e}")
-        return None, None
+        return None, None, None
 
 
 def process_frame(frame, yolo_model, custom_model, fire_model, settings):
@@ -94,6 +93,7 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
 
     global_is_danger = False
     global_is_warning = False
+    global_is_fall = False
 
     # 1. 구역 그리기
     active_polygons = []
@@ -131,11 +131,13 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
 
             p_danger = False
             p_warning = False
+            is_fall = False
             wrist_points = []
 
             # 팔 정의 (우, 좌)
             arms = [{'side': 'Right', 's': 6, 'e': 8, 'w': 10, 'h': 12},
                     {'side': 'Left', 's': 5, 'e': 7, 'w': 9, 'h': 11}]
+
 
             for arm in arms:
                 if len(kps) > arm['h'] and kps[arm['w']][2] >= 0.25:
@@ -146,6 +148,25 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
 
                     has_hip = hip[2] > 0.25
                     hy = int(hip[1]) if has_hip else 0
+                    hx = int(hip[0]) if has_hip else 0
+
+                    # 쓰러짐 감지
+                    check_fall_algo = settings.get('fall_check', True)
+                    fall_ratio = settings.get('fall_ratio', 1.2)
+
+                    # 조건: 체크박스가 켜져있고 골반이 보일때만 실행
+                    if has_hip and check_fall_algo:
+                        body_w = abs(sx - hx)
+                        body_h = abs(sy - hy)
+
+                        # 슬라이더 값(fall_ratio)작용
+                        if body_w > body_h *fall_ratio:
+                            is_fall = True
+                        # 옵션: 골반이 어께보다 높으면 무조건 위험
+                        if hy <= sy:
+                            is_fall = True
+
+
                     safe_y = hy - (abs(hy - sy) * hip_r) if has_hip else 0
                     is_low = (wy > safe_y) if has_hip else False
 
@@ -165,13 +186,23 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
                     ext_r = (get_distance((sx, sy), (wx, wy)) / (len_u + len_l)) if (len_u + len_l) > 0 else 0
 
                     is_algo = (angle > ang_th) or (ext_r > ext_th)
-                    is_ai = False
-                    if mode in ['AI', 'OR', 'AND'] and custom_model:
-                        inp = pd.DataFrame(
-                            [{'rw_x': wx / w, 'rw_y': wy / h, 're_x': ex / w, 're_y': ey / h, 'rs_x': sx / w,
-                              'rs_y': sy / h}])
+                    is_ai_reach = False
+
+                    # 모델 입력 데이터 구성(8개 특성)
+                    if mode in ['AI', 'OR', 'AND'] and custom_model and has_hip:
+                        inp = pd.DataFrame([{
+                            'rw_x': wx / w, 'rw_y': wy / h,
+                            're_x': ex / w, 're_y': ey / h,
+                            'rs_x': sx / w, 'rs_y': sy / h,
+                            'rh_x': hx / w, 'rh_y': hy / h,
+                        }])
                         try:
-                            is_ai = (custom_model.predict(inp)[0] == 1)
+                            pred = custom_model.predict(inp)[0]
+                            if pred == 1:
+                                is_ai_reach = True # 손뻗음
+                            elif pred == 2:
+                                # is_fall = True  # 쓰러짐
+                                pass
                         except:
                             pass
 
@@ -179,11 +210,11 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
                     if mode == 'Algorithm':
                         is_reach = is_algo
                     elif mode == 'AI':
-                        is_reach = is_ai
+                        is_reach = is_ai_reach
                     elif mode == 'OR':
-                        is_reach = is_algo or is_ai
+                        is_reach = is_algo or is_ai_reach
                     elif mode == 'AND':
-                        is_reach = is_algo and is_ai
+                        is_reach = is_algo and is_ai_reach
                     else:
                         is_reach = is_algo
 
@@ -197,28 +228,42 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
                             in_d = True
                         elif dist >= -warn_dist:
                             in_w = True
-
-                    if in_d:
-                        p_danger = True
-                    elif in_w and is_reach:
-                        p_warning = True
+                    # 손이 제한선 아래 있으면 무조건 SAFE 처리
+                    if not is_low:      # 손높이 판정 로우가 아닐때
+                        if in_d:
+                            p_danger = True # 구역안에서 손을 들었을때만 위험
+                        elif in_w and is_reach:
+                            p_warning = True  # 근처에서 손뻗었을때만 경고
 
                     wrist_points.append(
                         {'x': wx, 'y': wy, 'state': 'D' if in_d else ('W' if in_w and is_reach else 'S')})
 
             if p_danger: global_is_danger = True
             if p_warning: global_is_warning = True
+            if is_fall: global_is_fall = True
 
             draw_box = True
-            if vis['alert_only'] and not (p_danger or p_warning): draw_box = False
+            if vis['alert_only'] and not (p_danger or p_warning or is_fall): draw_box = False
 
             if draw_box:
-                color = (255, 0, 0) if p_danger else ((255, 165, 0) if p_warning else (0, 255, 0))
+                if is_fall:
+                    color = (255, 0, 255)   # 보라색
+                    status_text = "FALL"
+                elif p_danger:
+                    color = (255, 0, 0) # 빨강
+                    status_text = "TOUCH"
+                elif p_warning:
+                    color = (255, 165, 0)  # 주황
+                    status_text = "REACH"
+                else:
+                    color = (0, 255, 0) # 초록
+                    status_text = "Safe"
+
+                # 박스 및 텍스트 그리기
                 if vis['bbox']:
                     cv2.rectangle(image, (int(bx1), int(by1)), (int(bx2), int(by2)), color, 2)
                     if vis['label']:
-                        status = "TOUCH" if p_danger else ("REACH" if p_warning else "Safe")
-                        cv2.putText(image, status, (int(bx1), int(by1) - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+                        cv2.putText(image, status_text, (int(bx1), int(by1) - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
 
                 if vis['wrist_dot']:
                     for wp in wrist_points:
@@ -230,7 +275,9 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
                         cv2.circle(image, (wp['x'], wp['y']), 6, c, -1)
 
     # 상태바
-    if global_is_danger:
+    if global_is_fall:
+        bar, msg, tc = (255, 0, 255),"EMERGENCY: FALL DETECTED", (255, 255, 255)
+    elif global_is_danger:
         bar, msg, tc = (255, 0, 0), "DANGER: TOUCH DETECTED", (255, 255, 255)
     elif global_is_warning:
         bar, msg, tc = (255, 165, 0), "WARNING: APPROACHING", (0, 0, 0)

@@ -5,7 +5,7 @@ import joblib
 print("최종 모델 학습 시작...")
 
 try:
-    df = pd.read_csv('../final_data.csv')
+    df = pd.read_csv('final_data.csv')
 except:
     print("final_data.csv가 없습니다.")
     exit()
