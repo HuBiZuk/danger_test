@@ -188,23 +188,78 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
                     is_algo = (angle > ang_th) or (ext_r > ext_th)
                     is_ai_reach = False
 
+                    # ==================================================
                     # 모델 입력 데이터 구성(8개 특성)
-                    if mode in ['AI', 'OR', 'AND'] and custom_model and has_hip:
-                        inp = pd.DataFrame([{
-                            'rw_x': wx / w, 'rw_y': wy / h,
-                            're_x': ex / w, 're_y': ey / h,
-                            'rs_x': sx / w, 'rs_y': sy / h,
-                            'rh_x': hx / w, 'rh_y': hy / h,
-                        }])
-                        try:
-                            pred = custom_model.predict(inp)[0]
-                            if pred == 1:
-                                is_ai_reach = True # 손뻗음
-                            elif pred == 2:
-                                # is_fall = True  # 쓰러짐
+                    if mode in ['AI', 'OR', 'AND'] and custom_model:
+
+                        # 1. 세션에 포즈 기록용 버퍼(임시 저장소)가 없으면 생성
+                        if 'pose_buffer' not in st.session_state:
+                            st.session_state['pose_buffer'] = []
+
+                        # 2. 현재 프레임의 키포인트 추출 (17개 점 x 3개 값 = 51개 데이터)
+                        # kps.shape => (17, 3) -> flatten => (51,)
+                        # 학습 데이터와 스케일을 맞추기 위해 정규화가 필요할 수 있으나,
+                        # 우선 오류 해결을 위해 원본 스케일 유지 또는 간단한 정규화 적용
+                        # (CSV가 어떻게 만들어졌는지에 따라 다름, 여기선 Raw 좌표 사용)
+                        current_pose = kps.flatten()
+
+                        # 3. 버퍼에 추가
+                        st.session_state['pose_buffer'].append(current_pose)
+
+                        # 4. 20프레임(약 1초) 이상 쌓이면 가장 오래된 것 삭제 (슬라이딩 윈도우)
+                        if len(st.session_state['pose_buffer']) > 20:
+                            st.session_state['pose_buffer'].pop(0)
+
+                        # 5. 데이터가 20프레임 꽉 찼을 때만 예측 시도
+                        if len(st.session_state['pose_buffer']) == 20:
+                            try:
+                                # 20개 프레임 데이터를 한 줄로 쫙 폅니다 (51 * 20 = 1020개)
+                                seq_data = np.concatenate(st.session_state['pose_buffer'])
+
+                                # 컬럼 이름 생성 (v0 ~ v1019) -> 학습 때와 똑같은 이름표 붙이기
+                                cols = [f"v{i}" for i in range(1020)]
+
+                                # 데이터프레임 생성
+                                inp = pd.DataFrame([seq_data], columns=cols)
+
+                                # 예측
+                                pred = custom_model.predict(inp)[0]
+
+                                # 라벨 매핑 (0:Safe, 1:Move, 2:THREAT)
+                                label_map = {0: "Safe", 1: "Move", 2: "THREAT"}
+
+                                # 결과 해석
+                                try:
+                                    key = int(pred)
+                                except:
+                                    key = pred  # 문자열일 경우
+
+                                text_str = label_map.get(key, str(key))
+
+                                # 화면 표시
+                                if vis['text']:
+                                    # 위협(2)일 때 빨간색, 그 외 초록색
+                                    # 만약 학습 데이터 라벨이 0,1,2가 아니라면 이 부분 조정 필요
+                                    is_threat_label = (str(key) == '2' or str(key) == 'threat')
+                                    t_color = (0, 0, 255) if is_threat_label else (0, 255, 0)
+
+                                    cv2.putText(image, f"AI: {text_str}", (sx, sy - 30),
+                                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, t_color, 2)
+
+                                # 위험 상황 판정 (라벨 2일 때)
+                                if str(key) == '2' or str(key) == 'threat':
+                                    is_ai_reach = True
+
+                            except Exception as e:
+                                # 차원 불일치 등 예외 처리
+                                # print(f"AI Prediction Error: {e}")
                                 pass
-                        except:
-                            pass
+                        else:
+                            # 데이터 모으는 중 표시
+                            if vis['text']:
+                                cv2.putText(image, f"AI: Gathering..({len(st.session_state['pose_buffer'])}/20)",
+                                            (sx, sy - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 100), 2)
+                    # ========================================================================
 
                     # 모드별 최종 판단로직 세분화
                     if mode == 'Algorithm':

@@ -4,7 +4,7 @@
     git add .
 
 2. 설명 적고 저장하기 (커밋)
-    git commit -m "(1208 아침)"
+    git commit -m "(1208 AI증강데이터 학습구현)"
 
 3. 깃허브에 올리기 (푸쉬)
     git push origin main

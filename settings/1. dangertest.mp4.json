@@ -30,7 +30,7 @@
     "angle_threshold": 130,
     "hip_ratio": 0.2,
     "extension_threshold": 0.85,
-    "detection_mode": "OR",
+    "detection_mode": "AI",
     "vis_options": {
         "alert_only": true,
         "bbox": true,
@@ -40,5 +40,7 @@
         "wrist_dot": true,
         "text": true
     },
-    "fire_check": false
+    "fire_check": false,
+    "fall_check": true,
+    "fall_ratio": 1.2
 }
