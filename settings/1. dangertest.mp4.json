@@ -32,11 +32,11 @@
     "extension_threshold": 0.85,
     "detection_mode": "AI",
     "vis_options": {
-        "alert_only": true,
+        "alert_only": false,
         "bbox": true,
         "label": true,
-        "skeleton": false,
-        "zones": false,
+        "skeleton": true,
+        "zones": true,
         "wrist_dot": true,
         "text": true
     },

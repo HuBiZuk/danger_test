@@ -38,7 +38,7 @@
         "bbox": true,
         "label": true,
         "wrist_dot": true,
-        "text": true
+        "text": false
     },
     "fire_check": false
 }

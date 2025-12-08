@@ -48,7 +48,7 @@ with left_col:
     if selected_tab == "📝 구역 관리":
         view.render_zone_tab(sel_v, curr_settings, video_path)
     elif selected_tab == "⚡ 감도 설정":
-        wd, et, at, md, hr, fire_check, fall_check, fr = view.render_sensitivity_tab(sel_v, curr_settings)
+        wd, et, at, md, hr, fire_check, fall_check, fr, ai_th = view.render_sensitivity_tab(sel_v, curr_settings)
         st.session_state['wd'] = wd
         st.session_state['et'] = et
         st.session_state['at'] = at
@@ -57,6 +57,8 @@ with left_col:
         st.session_state['fire_check'] = fire_check
         st.session_state['fall_check'] = fall_check
         st.session_state['fr'] = fr
+        st.session_state['ai_th'] = ai_th  # 👈 [추가] 세션에 저장
+
 
     elif selected_tab == "👁️ 시각화 설정":
         # render_vis_tab에서 리턴값을 받아야 함
@@ -96,6 +98,7 @@ with right_col:
     live_settings['fire_check'] = st.session_state.get('fire_check', curr_settings.get("fire_check", False))
     live_settings['fall_check'] = st.session_state.get('fall_check', curr_settings.get("fall_check", True))
     live_settings['fall_ratio'] = st.session_state.get('fr', curr_settings.get("fall_ratio", 1.2))
+    live_settings['ai_threshold'] = st.session_state.get('ai_th', curr_settings.get("ai_threshold", 0.7))
 
 
 

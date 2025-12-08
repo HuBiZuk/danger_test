@@ -1,6 +1,6 @@
 # view.py
 
-import streamlit as st  # ⚠️ 이 줄이 가장 상단에 있어야 함!
+import streamlit as st
 import cv2
 import time
 import os
@@ -40,9 +40,9 @@ def render_sidebar():
             time.sleep(1)
             st.experimental_rerun()
 
-        #-----------------------
+        # -----------------------
         # AI 모델 선택 박스
-        #----------------------
+        # ----------------------
         st.markdown("---")
         st.subheader("AI모델 선택")
 
@@ -61,7 +61,7 @@ def render_sidebar():
         select_model = st.selectbox("YOLO 포즈 모델", model_option, index=5)
         st.caption("※ v11은 성능이 더 좋으며, v9/v10은 포즈 미지원")
         st.markdown("---")
-        #---------------------------------------------------------
+        # ---------------------------------------------------------
 
         # 영상 목록 로드
         video_list = [f for f in os.listdir("videos") if f.endswith((".mp4", ".avi"))]
@@ -72,9 +72,6 @@ def render_sidebar():
             return sel_video, select_model
 
         return None, select_model
-
-
-
 
 
 # ===============================================================
@@ -175,7 +172,7 @@ def render_zone_tab(sel_v, curr_settings, video_path):
     )
 
     # ===============================================================
-    # 🔥 첫 저장 시 좌표 튐 문제 해결 (originX/Y에 따른 Path 좌표 해석)
+    # 🔥 첫 저장 시 좌표 튐 문제 해결 (Path 객체 처리)
     # ===============================================================
     if st.button("💾 구역 저장 (적용)", type="primary", use_container_width=True):
 
@@ -185,59 +182,27 @@ def render_zone_tab(sel_v, curr_settings, video_path):
             for obj in canvas.json_data["objects"]:
 
                 points = []
-                # ------------------------------------
-                # Case A: 새로 그린 polygon (구역설정 특어진 원인: path로 그려지는데 plygon 좌표로 그려서 좌표 안맞음)
-                # ------------------------------------
-                """
-                # 삭제
-                if obj["type"] == "polygon":
-                    st.write("--- 새로 그린 Polygon 객체 디버깅 시작 ---")
-                    st.json(obj)  # obj 딕셔너리의 전체 내용을 JSON 형태로 출력
-                    st.write("--- 새로 그린 Polygon 객체 디버깅 종료 ---")
 
+                if obj["type"] == "path":
                     left = obj["left"]
                     top = obj["top"]
-                    scaleX = obj["scaleX"]
-                    scaleY = obj["scaleY"]
+                    scaleX = obj.get("scaleX", 1.0)
+                    scaleY = obj.get("scaleY", 1.0)
 
-                    for p in obj["points"]:
-                        # 현재로서는 가장 단순한 형태의 변환 로직을 유지.
-                        abs_x = left + p["x"]  # scaleX 곱하기 제거 상태 유지
-                        abs_y = top + p["y"]  # scaleY 곱하기 제거 상태 유지
-                        points.append([abs_x / cw, abs_y / ch])
-                """
-
-                # ------------------------------------
-                # ✅ Path 객체 처리 (새로 그린 polygon도 이 타입으로 반환됨)
-                # ------------------------------------
-                if obj["type"] == "path":  # ⚠️모든 도형은 이 블록에서 처리.
-                    left = obj["left"]
-                    top = obj["top"]
-                    scaleX = obj.get("scaleX", 1.0)  # scaleX, scaleY가 없을 경우 기본값 1.0
-                    scaleY = obj.get("scaleY", 1.0)  # (JSON에 있었지만, 안전하게 get으로 처리)
-
-                    # originX와 originY를 확인하여 좌표 해석 방식을 결정
-                    # 기본값은 'left', 'top'이며, 없으면 이렇게 가정
                     origin_x = obj.get("originX", "left")
                     origin_y = obj.get("originY", "top")
 
-                    # originX/Y가 'center'인 경우, path 좌표가 이미 절대 캔버스 좌표일 가능성이 높음
-                    # (JSON 분석 결과, 'center'일 때 path 좌표가 절대 좌표였음)
                     is_path_coords_absolute = (origin_x == "center" and origin_y == "center")
 
                     for cmd in obj["path"]:
-                        if cmd[0] in ["M", "L"]:  # Path 명령 중 이동(M) 또는 선(L)만 처리
+                        if cmd[0] in ["M", "L"]:
                             abs_x = 0
                             abs_y = 0
 
                             if is_path_coords_absolute:
-                                # origin이 'center'이고 path 좌표가 이미 절대값인 경우
-                                # left/top/scaleX/Y는 건드리지 않고 path 좌표를 직접 사용
                                 abs_x = cmd[1]
                                 abs_y = cmd[2]
                             else:
-                                # origin이 'left'/'top'이거나 다른 경우, path 좌표는 left/top 기준 상대값
-                                # 우리가 initial_drawing에서 생성한 path 객체들이 이 경우에 해당
                                 abs_x = left + cmd[1] * scaleX
                                 abs_y = top + cmd[2] * scaleY
 
@@ -254,8 +219,8 @@ def render_zone_tab(sel_v, curr_settings, video_path):
 
         st.experimental_rerun()
 
-        # ===============================================================
-    # 구역 목록 (삭제 즉시 반영 + 기존 기능 유지)
+    # ===============================================================
+    # 구역 목록 (삭제 및 활성/비활성)
     # ===============================================================
     st.markdown("---")
     st.subheader("📋 구역 목록")
@@ -292,7 +257,7 @@ def render_zone_tab(sel_v, curr_settings, video_path):
 
 
 # ===============================================================
-# 감도 설정
+# 감도 설정 (노란 구역 크기 'wd' 및 AI 설정 포함)
 # ===============================================================
 def render_sensitivity_tab(sel_v, curr_settings):
     st.subheader("경고/위험 판단 기준")
@@ -300,31 +265,40 @@ def render_sensitivity_tab(sel_v, curr_settings):
     # 화재감지 체크박스
     fire_check = st.checkbox("🔥 화재 / 연기 감지 모드 켜기", value=curr_settings.get("fire_check", False))
 
-    st.markdown("---")  # 구분선
+    st.markdown("---")
 
     # 판단모드 옵션 변경
     mode_options = ["Algorithm", "AI", "OR", "AND"]
-    current_mode = curr_settings.get("detection_mode","Algorithm")
+    current_mode = curr_settings.get("detection_mode", "Algorithm")
 
-    # 기존 설정 호환성 처리(기존Both 저장되있을시 AND로 처리
-    if current_mode == "Both":
-        current_mode = "AND"
-    if current_mode not in mode_options:
-        current_mode = "Algorithm"
+    if current_mode == "Both": current_mode = "AND"
+    if current_mode not in mode_options: current_mode = "Algorithm"
 
     md = st.radio("판단 모드", mode_options,
                   index=mode_options.index(current_mode),
                   horizontal=True)
-    wd = st.slider("⚠️ 경고 감지 거리", 0, 200, curr_settings.get("warning_distance", 30))
+
+    # 1. 경고 감지 거리 (이게 노란 박스 크기 결정!)
+    wd = st.slider("⚠️ 경고 감지 거리 (노란 구역)", 0, 200, curr_settings.get("warning_distance", 30))
+
     et = st.slider("팔 뻗음 비율", 0.5, 1.0, curr_settings["extension_threshold"])
     at = st.slider("팔 각도 임계값", 90, 180, curr_settings["angle_threshold"])
     hr = st.slider("골반기준 손 높이 상한 비율", 0.0, 1.0, curr_settings.get("hip_ratio", 0.2), 0.05)
 
     st.markdown("---")
+
+    # 낙상 감지
     fall_check = st.checkbox("🤸 낙상 감지 켜기", value=curr_settings.get("fall_check", True))
-    fr = st.slider("낙상 기울기 비율(낮을수록 민감", 0.5, 2.0,
+    fr = st.slider("낙상 기울기 비율(낮을수록 민감)", 0.5, 2.0,
                    curr_settings.get("fall_ratio", 1.2), 0.1,
                    disabled=not fall_check)
+
+    st.markdown("---")
+
+    # [신규] AI 민감도 슬라이더
+    st.markdown("##### 🧠 AI 민감도 설정")
+    ai_th = st.slider("AI 위협 민감도 (낮을수록 예민)", 0.1, 1.0,
+                      curr_settings.get("ai_threshold", 0.7), 0.05)
 
     if st.button("감도 저장"):
         curr_settings.update({
@@ -335,12 +309,14 @@ def render_sensitivity_tab(sel_v, curr_settings):
             "extension_threshold": et,
             "angle_threshold": at,
             "detection_mode": md,
-            "hip_ratio": hr
+            "hip_ratio": hr,
+            "ai_threshold": ai_th  # 저장 항목
         })
         save_settings(sel_v, curr_settings)
         st.success("저장됨")
 
-    return wd, et, at, md, hr, fire_check, fall_check, fr
+    # 리턴값 9개 (wd가 포함되어야 노란박스가 그려짐)
+    return wd, et, at, md, hr, fire_check, fall_check, fr, ai_th
 
 
 # ===============================================================
@@ -349,14 +325,18 @@ def render_sensitivity_tab(sel_v, curr_settings):
 def render_vis_tab(sel_v, curr_settings):
     st.subheader("화면 표시 옵션")
 
-    vo = curr_settings["vis_options"]
+    # 기본값 안전 처리
+    vo = curr_settings.get("vis_options", {
+        "alert_only": False, "skeleton": True, "zones": True,
+        "bbox": True, "wrist_dot": True, "text": True
+    })
 
-    c_alert = st.checkbox("🚨 위험 시에만 표시", value=vo["alert_only"])
-    c_sk = st.checkbox("뼈대 표시", value=vo["skeleton"])
-    c_zn = st.checkbox("구역 표시", value=vo["zones"])
-    c_bb = st.checkbox("객체 박스", value=vo["bbox"])
-    c_dot = st.checkbox("손목 점", value=vo["wrist_dot"])
-    c_txt = st.checkbox("상태 텍스트", value=vo["text"])
+    c_alert = st.checkbox("🚨 위험 시에만 표시", value=vo.get("alert_only", False))
+    c_sk = st.checkbox("뼈대 표시", value=vo.get("skeleton", True))
+    c_zn = st.checkbox("구역 표시", value=vo.get("zones", True))
+    c_bb = st.checkbox("객체 박스", value=vo.get("bbox", True))
+    c_dot = st.checkbox("손목 점", value=vo.get("wrist_dot", True))
+    c_txt = st.checkbox("상태 텍스트", value=vo.get("text", True))
 
     if st.button("시각화 옵션 저장"):
         vo.update({
@@ -367,6 +347,7 @@ def render_vis_tab(sel_v, curr_settings):
             "wrist_dot": c_dot,
             "text": c_txt
         })
+        curr_settings["vis_options"] = vo
         save_settings(sel_v, curr_settings)
         st.success("저장됨")
 

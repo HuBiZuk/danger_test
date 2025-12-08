@@ -1,9 +1,35 @@
 {
-    "zones": [],
+    "zones": [
+        {
+            "points": [
+                [
+                    0.8633333333333333,
+                    0.4955555555555556
+                ],
+                [
+                    0.5783333333333334,
+                    0.5177777777777778
+                ],
+                [
+                    0.58,
+                    0.15777777777777777
+                ],
+                [
+                    0.8466666666666666,
+                    0.1644444444444444
+                ],
+                [
+                    0.8533333333333334,
+                    0.49333333333333335
+                ]
+            ],
+            "active": true
+        }
+    ],
     "fire_check": false,
     "fall_check": true,
     "fall_ratio": 1.2,
-    "warning_distance": 30,
+    "warning_distance": 71,
     "extension_threshold": 0.85,
     "angle_threshold": 130,
     "hip_ratio": 0.2,
@@ -16,5 +42,6 @@
         "label": true,
         "wrist_dot": true,
         "text": true
-    }
+    },
+    "ai_threshold": 0.6
 }

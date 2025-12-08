@@ -1,20 +1,17 @@
+# data_augmenter.py
+
 import pandas as pd
 import numpy as np
 
 
-# --- 헬퍼 함수: x, y 좌표 인덱스 분리 ---
+# --- 헬퍼 함수 ---
 def get_xy_indices(num_cols):
-    """
-    x: 0, 2, 4... (짝수 인덱스)
-    y: 1, 3, 5... (홀수 인덱스)
-    """
     x_indices = np.arange(0, num_cols, 2)
     y_indices = np.arange(1, num_cols, 2)
     return x_indices, y_indices
 
 
 # === 증강기법 ===
-# --- 1. 크기조절 (Scaling) ---
 def apply_scaling(data, scale_factor, x_indices, y_indices):
     scaled = data.copy()
     scaled[:, x_indices] *= scale_factor
@@ -22,7 +19,6 @@ def apply_scaling(data, scale_factor, x_indices, y_indices):
     return scaled
 
 
-# --- 2. 위치 이동(Translation) ---
 def apply_translation(data, delta_x, delta_y, x_indices, y_indices):
     translated = data.copy()
     translated[:, x_indices] += delta_x
@@ -30,7 +26,6 @@ def apply_translation(data, delta_x, delta_y, x_indices, y_indices):
     return translated
 
 
-# --- 3. 노이즈 추가 (Jittering) ---
 def apply_jittering(data, x_indices, y_indices, noise_scale=1.0):
     noise = np.random.normal(0, noise_scale, data.shape)
     jittered = data.copy()
@@ -39,34 +34,29 @@ def apply_jittering(data, x_indices, y_indices, noise_scale=1.0):
     return jittered
 
 
-# --- 4. 좌우 반전(Mirroring) ---
 def apply_mirroring_2d(data, x_indices, max_x):
     mirrored = data.copy()
     mirrored[:, x_indices] = max_x - mirrored[:, x_indices]
     return mirrored
 
 
-# --- [메인] 증강 배율 적용 ---
+# --- [메인] 증강 실행 ---
 def run_augmentation(df_original, neutral_factor, movement_factor, threat_factor):
-    # 1. 컬럼 분리 ('v'로 시작하는 좌표 vs 나머지 메타데이터)
+    # 1. 컬럼 분리
     v_cols = [c for c in df_original.columns if c.startswith('v')]
     other_cols = [c for c in df_original.columns if c not in v_cols]
 
-    if not v_cols:
-        raise ValueError("데이터에 'v'로 시작하는 좌표 컬럼이 없습니다.")
-    if 'label' not in df_original.columns:
-        raise ValueError("'label' 컬럼이 필요합니다.")
+    if not v_cols: raise ValueError("데이터에 'v' 컬럼이 없습니다.")
+    if 'label' not in df_original.columns: raise ValueError("'label' 컬럼이 필요합니다.")
 
-    # 2. 데이터를 Numpy 배열로 변환 (인덱스 에러 원천 차단)
+    # 2. Numpy 변환
     try:
-        coords = df_original[v_cols].values.astype(float)  # 좌표값
+        coords = df_original[v_cols].values.astype(float)
     except ValueError:
-        # 혹시 v컬럼에 문자가 섞여있을 경우 대비
-        print("⚠️ 주의: 좌표 데이터에 숫자가 아닌 값이 포함되어 있어 강제 변환합니다.")
+        print("⚠️ 주의: 문자열이 포함된 데이터 강제 변환")
         coords = df_original[v_cols].apply(pd.to_numeric, errors='coerce').fillna(0).values
 
-    meta = df_original[other_cols].values  # 나머지 정보
-
+    meta = df_original[other_cols].values
     num_coords = len(v_cols)
     x_idx, y_idx = get_xy_indices(num_coords)
 
@@ -77,19 +67,18 @@ def run_augmentation(df_original, neutral_factor, movement_factor, threat_factor
     except:
         max_x = 1920.0
 
-    # 3. 라벨 텍스트 처리 (숫자 0, 1, 2 포함)
+    # 3. 라벨 처리
     label_col_idx = other_cols.index('label')
     labels = meta[:, label_col_idx].astype(str)
-    labels = np.char.strip(labels)  # 공백 제거
+    labels = np.char.strip(labels)
 
     print(f"👉 [DEBUG] 발견된 라벨 목록: {np.unique(labels)}")
 
-    # 키워드 정의 (숫자 '0', '1', '2' 추가됨)
+    # 키워드 정의
     threat_kws = ['손뻗기', '손 뻗기', '주머니', '절도', '던지기', '주먹', '밀치기', '공격', '위협', 'threat', '2']
     move_kws = ['걷기', '이동', '뒷걸음', '회전', '통화하며', 'movement', '1']
     neutral_kws = ['정지', '뒷짐', '팔짱', '앉은', '앉아', '쪼그려', '핸드폰', '머리', '얼굴', '기본', 'neutral', '0']
 
-    # 벡터 검색 함수
     def check_keywords(label_arr, keywords):
         cond = np.zeros(len(label_arr), dtype=bool)
         for kw in keywords:
@@ -101,19 +90,12 @@ def run_augmentation(df_original, neutral_factor, movement_factor, threat_factor
     is_move = check_keywords(labels, move_kws) & (~is_threat)
     is_neutral = check_keywords(labels, neutral_kws) & (~is_threat) & (~is_move)
 
-    # 분류 안 된 나머지는 Neutral로 처리
     is_others = ~(is_threat | is_move | is_neutral)
     if np.any(is_others):
-        print(f"⚠️ 분류되지 않은 데이터 {np.sum(is_others)}개는 'Neutral'로 처리합니다.")
+        print(f"⚠️ 분류 안 된 {np.sum(is_others)}개는 Neutral로 처리")
         is_neutral |= is_others
 
-    idx_threat = np.where(is_threat)[0]
-    idx_move = np.where(is_move)[0]
-    idx_neutral = np.where(is_neutral)[0]
-
-    print(f"📊 분류 결과 - Threat: {len(idx_threat)}, Move: {len(idx_move)}, Neutral: {len(idx_neutral)}")
-
-    # 4. 내부 증강 함수 (배열 기반 - 고속)
+    # 4. 내부 증강 함수 정의
     def augment_group(indices, factor):
         if len(indices) == 0: return None, None
 
@@ -129,7 +111,6 @@ def run_augmentation(df_original, neutral_factor, movement_factor, threat_factor
             for _ in range(num_aug):
                 new_coords = src_coords.copy()
 
-                # 랜덤 변환 적용
                 if np.random.rand() < 0.3:
                     new_coords = apply_mirroring_2d(new_coords, x_idx, max_x)
 
@@ -148,12 +129,22 @@ def run_augmentation(df_original, neutral_factor, movement_factor, threat_factor
 
         return np.vstack(out_coords_list), np.vstack(out_meta_list)
 
-    # 5. 실행
-    tc, tm = augment_group(idx_threat, threat_factor)
+    # 5. [실행 단계] 여기서 인덱스를 뽑고 함수를 호출해야 함 (순서 중요!)
+    idx_threat = np.where(is_threat)[0]
+    idx_move = np.where(is_move)[0]
+    idx_neutral = np.where(is_neutral)[0]
+
+    print(f"📊 분류 결과 - Threat: {len(idx_threat)}, Move: {len(idx_move)}, Neutral: {len(idx_neutral)}")
+
+    # Threat 데이터 강력 증강 (3배 더 뻥튀기)
+    final_threat_factor = threat_factor * 3
+
+    # 각 그룹별 증강 실행
+    tc, tm = augment_group(idx_threat, final_threat_factor)
     mc, mm = augment_group(idx_move, movement_factor)
     nc, nm = augment_group(idx_neutral, neutral_factor)
 
-    # 6. 결과 병합
+    # 6. 병합 및 리턴
     final_c_list = []
     final_m_list = []
 
@@ -166,7 +157,6 @@ def run_augmentation(df_original, neutral_factor, movement_factor, threat_factor
     final_coords = np.vstack(final_c_list)
     final_meta = np.vstack(final_m_list)
 
-    # DataFrame 복원
     df_c = pd.DataFrame(final_coords, columns=v_cols)
     df_m = pd.DataFrame(final_meta, columns=other_cols)
 
