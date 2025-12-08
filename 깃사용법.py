@@ -4,7 +4,7 @@
     git add .
 
 2. 설명 적고 저장하기 (커밋)
-    git commit -m "(1205 개인작업 1차 완료_3)"
+    git commit -m "(1208 아침)"
 
 3. 깃허브에 올리기 (푸쉬)
     git push origin main

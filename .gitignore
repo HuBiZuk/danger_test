@@ -50,5 +50,3 @@ Thumbs.db
 # 로그 파일
 *.log
 
-# AI학습모델
-*.pt
