@@ -67,6 +67,8 @@ def render_sidebar():
         video_list = [f for f in os.listdir("videos") if f.endswith((".mp4", ".avi"))]
         video_list.sort()
 
+        video_list.insert(0, "실시간 카메라")
+
         if video_list:
             sel_video = st.selectbox("영상 선택", video_list)
             return sel_video, select_model

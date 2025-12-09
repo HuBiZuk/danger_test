@@ -50,3 +50,5 @@ Thumbs.db
 # 로그 파일
 *.log
 
+
+*.pt

@@ -29,7 +29,10 @@ if not sel_v or not yolo_model:
     st.stop()
 
 # 4. 설정 로드
-video_path = os.path.join("videos", sel_v)
+if sel_v == "실시간 카메라":
+    video_path = 0
+else:
+    video_path = os.path.join("videos", sel_v)
 curr_settings = utils.load_settings(sel_v)
 
 # 5. 메인 레이아웃 (좌우 분할)
@@ -80,9 +83,15 @@ with right_col:
         run_monitor = st.checkbox("▶ 재생", value=True)
     with col_p1:
         cap = cv2.VideoCapture(video_path)
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        # st.slider의 label_visibility는 Streamlit 1.22.0에서 지원되지 않습니다.
-        frame_idx = st.slider("탐색", 0, total_frames, 0) # label=""로 레이블 명시적 제거
+
+        if video_path == 0 and not cap.isOpened():
+            st.error("❌ 연결된 카메라가 없습니다.")
+            st.stop()
+        if video_path != 0:
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            frame_idx = st.slider("탐색", 0, total_frames, 0) # label=""로 레이블 명시적 제거
+        else:
+            frame_idx = 0
 
 
     st_screen = st.empty()
@@ -118,9 +127,16 @@ with right_col:
     # 재생 루프
     if run_monitor:
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+        frame_count = 0
+
         while cap.isOpened():
             ret, frame = cap.read()
+            frame_count += 1
+            if frame_count % 2 != 0:
+                continue
+
             if not ret:
+                if video_path == 0: break
                 cap.set(cv2.CAP_PROP_POS_FRAMES, 0)  # 무한 반복
                 continue
 

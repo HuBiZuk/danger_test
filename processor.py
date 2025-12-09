@@ -70,7 +70,7 @@ def get_models(model_name='yolov8n-pose.pt'):
 
 def process_frame(frame, yolo_model, custom_model, fire_model, settings):
     device = get_device()
-    frame = cv2.resize(frame, (800, 600))
+    frame = cv2.resize(frame, (640, 480))
     h, w, _ = frame.shape
 
     # 설정값 풀기
@@ -94,9 +94,9 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
             cv2.putText(frame, f"{cls_name} {conf:.2f}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 3)
             if 'fire' in cls_name.lower():
-                cv2.putText(frame, "FIRE DETECTED!!!", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 3)
+                cv2.putText(frame, "FIRE DETECTED!!!", (50, h - 60), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 3)
 
-    results = yolo_model(frame, verbose=False, conf=0.25, device=device)
+    results = yolo_model(frame, verbose=False, conf=0.15, device=device)
 
     # 배경 생성
     if vis['alert_only']:
@@ -204,6 +204,8 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
                     # =========================================================
                     if mode in ['AI', 'OR', 'AND'] and custom_model:
 
+                        if 'pose_buffer' not in st.session_state: st.session_state['pose_buffer'] = []
+
                         # 변수 및 버퍼 초기화
                         if 'pose_buffer' not in st.session_state: st.session_state['pose_buffer'] = []
                         if 'threat_cooldown' not in st.session_state: st.session_state['threat_cooldown'] = 0
@@ -213,7 +215,7 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
 
                         # 1. 비율 데이터 추출 (34 features)
                         current_pose = get_norm_xy(kps)
-                        st.session_state['pose_buffer'].append(current_pose)
+                        if 'pose_buffer' not in st.session_state: st.session_state['pose_buffer'] = []
 
                         if len(st.session_state['pose_buffer']) > 30:
                             st.session_state['pose_buffer'].pop(0)
@@ -267,42 +269,42 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
                                         text_str = f"Safe ({p_safe * 100:.0f}%)"
                                     text_color = (0, 255, 0)  # 초록색
 
-                                    # (5) 화면 표시
-                                    if vis['text']:
-                                        # 머리 위 라벨 (기존 유지)
-                                        cv2.putText(image, f"AI: {text_str}", (sx, sy - 30),
-                                                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, text_color, 2)
+                                # (5) 화면 표시
+                                if vis['text']:
+                                    # 머리 위 라벨 (기존 유지)
+                                    cv2.putText(image, f"AI: {text_str}", (sx, sy - 30),
+                                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, text_color, 2)
 
-                                        # 👇 [수정] 왼쪽 아래 구석으로 이동
-                                        base_y = h - 120  # 바닥에서 120픽셀 위를 시작점으로 잡음
+                                    # 👇 [수정] 왼쪽 아래 구석으로 이동
+                                    base_y = h - 120  # 바닥에서 120픽셀 위를 시작점으로 잡음
 
-                                        # 검은 배경 박스
-                                        cv2.rectangle(image, (10, base_y), (220, base_y + 80), (0, 0, 0), -1)
+                                    # 검은 배경 박스
+                                    cv2.rectangle(image, (10, base_y), (220, base_y + 80), (0, 0, 0), -1)
 
-                                        # 1. Safe (초록)
-                                        cv2.putText(image, f"Safe: {p_safe * 100:.0f}%", (20, base_y + 20), 1, 1,
-                                                    (0, 255, 0), 1)
-                                        cv2.rectangle(image, (100, base_y + 10), (100 + int(p_safe * 100), base_y + 20),
-                                                      (0, 255, 0), -1)
+                                    # 1. Safe (초록)
+                                    cv2.putText(image, f"Safe: {p_safe * 100:.0f}%", (20, base_y + 20), 1, 1,
+                                                (0, 255, 0), 1)
+                                    cv2.rectangle(image, (100, base_y + 10), (100 + int(p_safe * 100), base_y + 20),
+                                                  (0, 255, 0), -1)
 
-                                        # 2. Move (노랑)
-                                        cv2.putText(image, f"Move: {p_move * 100:.0f}%", (20, base_y + 45), 1, 1,
-                                                    (0, 255, 255), 1)
-                                        cv2.rectangle(image, (100, base_y + 35), (100 + int(p_move * 100), base_y + 45),
-                                                      (0, 255, 255), -1)
+                                    # 2. Move (노랑)
+                                    cv2.putText(image, f"Move: {p_move * 100:.0f}%", (20, base_y + 45), 1, 1,
+                                                (0, 255, 255), 1)
+                                    cv2.rectangle(image, (100, base_y + 35), (100 + int(p_move * 100), base_y + 45),
+                                                  (0, 255, 255), -1)
 
-                                        # 3. Threat (빨강)
-                                        cv2.putText(image, f"Threat: {p_threat * 100:.0f}%", (20, base_y + 70), 1, 1,
-                                                    (0, 0, 255), 1)
-                                        cv2.rectangle(image, (100, base_y + 60),
-                                                      (100 + int(p_threat * 100), base_y + 70), (0, 0, 255), -1)
+                                    # 3. Threat (빨강)
+                                    cv2.putText(image, f"Threat: {p_threat * 100:.0f}%", (20, base_y + 70), 1, 1,
+                                                (0, 0, 255), 1)
+                                    cv2.rectangle(image, (100, base_y + 60),
+                                                  (100 + int(p_threat * 100), base_y + 70), (0, 0, 255), -1)
 
                                 # 위험 신호 전달
                                 if is_threat_now:
                                     is_ai_reach = True
 
                             except Exception as e:
-                                pass
+                                print(f"에러발생: {e}")
                     # =========================================================
 
                     # 모드별 최종 판단 통합
@@ -331,7 +333,7 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
 
                     # [중요] 손이 제한선 아래가 아닐 때만 경고
                     if not is_low:
-                        if in_d:
+                        if in_d and is_reach:
                             p_danger = True
                         elif in_w and is_reach:
                             p_warning = True
