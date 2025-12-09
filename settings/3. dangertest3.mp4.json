@@ -123,7 +123,7 @@
                     0.4666666666666667
                 ]
             ],
-            "active": false
+            "active": true
         },
         {
             "points": [
@@ -148,7 +148,7 @@
                     0.47555555585696374
                 ]
             ],
-            "active": false
+            "active": true
         },
         {
             "points": [
@@ -173,14 +173,14 @@
                     0.4533333333333333
                 ]
             ],
-            "active": false
+            "active": true
         }
     ],
     "warning_distance": 18,
-    "angle_threshold": 130,
-    "hip_ratio": 0.55,
-    "extension_threshold": 0.85,
-    "detection_mode": "AI",
+    "angle_threshold": 100,
+    "hip_ratio": 0.45,
+    "extension_threshold": 0.6,
+    "detection_mode": "Algorithm",
     "vis_options": {
         "alert_only": true,
         "bbox": true,
@@ -192,5 +192,6 @@
     },
     "fire_check": false,
     "fall_check": true,
-    "fall_ratio": 1.2
+    "fall_ratio": 1.2,
+    "ai_threshold": 0.7
 }

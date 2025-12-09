@@ -1,5 +1,31 @@
 {
-    "zones": [],
+    "zones": [
+        {
+            "points": [
+                [
+                    0.26666666666666666,
+                    0.1622222222222222
+                ],
+                [
+                    0.325,
+                    0.15333333333333332
+                ],
+                [
+                    0.36666666666666664,
+                    0.54
+                ],
+                [
+                    0.32,
+                    0.56
+                ],
+                [
+                    0.26666666666666666,
+                    0.16
+                ]
+            ],
+            "active": true
+        }
+    ],
     "fire_check": false,
     "fall_check": true,
     "fall_ratio": 1.2,
@@ -7,7 +33,7 @@
     "extension_threshold": 0.85,
     "angle_threshold": 130,
     "hip_ratio": 0.2,
-    "detection_mode": "AI",
+    "detection_mode": "Algorithm",
     "vis_options": {
         "alert_only": false,
         "skeleton": true,

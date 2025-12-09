@@ -58,7 +58,7 @@ def render_sidebar():
         ]
 
         # index=5 는 'yolov8n-pose.pt' 기본값으로 설정
-        select_model = st.selectbox("YOLO 포즈 모델", model_option, index=5)
+        select_model = st.selectbox("YOLO 포즈 모델", model_option, index=0)
         st.caption("※ v11은 성능이 더 좋으며, v9/v10은 포즈 미지원")
         st.markdown("---")
         # ---------------------------------------------------------
@@ -107,11 +107,18 @@ def render_zone_tab(sel_v, curr_settings, video_path):
     cw, ch = 600, 450
 
     # ===============================================================
-    # 영상 첫 프레임 로딩
+    # 영상 15번째 프레임 로딩
     # ===============================================================
     if "canvas_bg" not in st.session_state or st.session_state.get("last_vid") != sel_v:
         cap = cv2.VideoCapture(video_path)
+        cap.set(cv2.CAP_PROP_POS_FRAMES, 15)
         ret, frame = cap.read()
+
+        # 영상이 짧아서 15번째 프레임 없으면 5번째 프레임 읽기
+        if not ret:
+            cap:set(cv2.CAP_PROP_POS_FRAMES, 0)
+            ret, frame = cap.read()
+
         cap.release()
 
         if ret:
