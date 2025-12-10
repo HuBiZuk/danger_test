@@ -42,5 +42,7 @@
     },
     "fire_check": false,
     "fall_check": true,
-    "fall_ratio": 1.2
+    "fall_ratio": 1.2,
+    "ai_threshold": 0.4,
+    "lock_duration": 0.5
 }

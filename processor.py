@@ -69,10 +69,18 @@ def get_models(model_name='yolov8n-pose.pt'):
 
 
 def process_frame(frame, yolo_model, custom_model, fire_model, settings):
-    ai_result = {"is_active": False, "safe": 0.0, "move": 0.0, "threat": 0.0}
+    ai_result = {"safe": 0.0, "move": 0.0, "threat": 0.0, "is_active": False}
+    ai_result_list = []
+
     device = get_device()
     frame = cv2.resize(frame, (640, 480))
     h, w, _ = frame.shape
+
+    # 버퍼 초기화
+    if 'pose_buffer' not in st.session_state:
+        st.session_state['pose_buffer'] = {}
+    if 'threat_cooldown' not in st.session_state or not isinstance(st.session_state['threat_cooldown'], dict):
+        st.session_state['threat_cooldown'] = {}
 
     # 설정값 풀기
     zones = settings['zones']
@@ -84,9 +92,11 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
     vis = settings['vis_options']
     lock_duration = settings.get('lock_duration', 30)
 
+    is_infinite_mode = (lock_duration > 1000)
+
     # 락 프레임 계산 30프레임 = 1초
-    if lock_duration > 1000:
-        lock_frames = lock_duration
+    if is_infinite_mode:
+        lock_frames = 999999
     else:
         lock_frames = lock_duration * 30
 
@@ -104,7 +114,7 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
             if 'fire' in cls_name.lower():
                 cv2.putText(frame, "FIRE DETECTED!!!", (50, h - 60), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 3)
 
-    results = yolo_model(frame, verbose=False, conf=0.15, device=device)
+    results = yolo_model.track(frame, persist=True, verbose=False, conf=0.15, device=device)    # track을 써야 객체마다 고유 ID 가 나옴
 
     # 배경 생성
     if vis['alert_only']:
@@ -142,6 +152,7 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
                 contours, _ = cv2.findContours(expanded_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
                 cv2.drawContours(image, contours, -1, (255, 255, 0), 2)  # 노란색 경계선
 
+
             # 기본 빨간 구역선
             cv2.polylines(image, [pts], True, (255, 0, 0), 2)
             start_pt = tuple(pts[0][0])
@@ -156,7 +167,14 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
         boxes_data = results[0].boxes.data.cpu().numpy()
 
         for box_info, kps in zip(boxes_data, keypoints_data):
-            bx1, by1, bx2, by2, b_conf, b_cls = box_info
+            if len(box_info) == 7:
+                bx1, by1, bx2, by2,track_id, b_conf, b_cls = box_info[:7]
+                track_id = int(track_id)
+            else:   # 데이터 이상하면 건너뜀
+                continue
+
+            current_timer = st.session_state['threat_cooldown'].get(track_id, 0)
+
             p_danger = False;
             p_warning = False;
             is_fall = False
@@ -211,28 +229,25 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
                     # 👇 [AI 판단 로직] 30프레임 버퍼 + 비율 정규화 + 슬라이더 적용
                     # =========================================================
                     if mode in ['AI', 'OR', 'AND'] and custom_model:
-
-                        if 'pose_buffer' not in st.session_state: st.session_state['pose_buffer'] = []
-
-                        # 변수 및 버퍼 초기화
-                        if 'pose_buffer' not in st.session_state: st.session_state['pose_buffer'] = []
-                        if 'threat_cooldown' not in st.session_state: st.session_state['threat_cooldown'] = 0
-
                         # 슬라이더 값 가져오기
                         ai_th_val = settings.get('ai_threshold', 0.7)
 
                         # 1. 비율 데이터 추출 (34 features)
                         current_pose = get_norm_xy(kps)
-                        if 'pose_buffer' not in st.session_state: st.session_state['pose_buffer'] = []
-                        st.session_state['pose_buffer'].append(current_pose)
 
-                        if len(st.session_state['pose_buffer']) > 30:
-                            st.session_state['pose_buffer'].pop(0)
+                        if track_id not in st.session_state['pose_buffer']: st.session_state['pose_buffer'][track_id] = []
+
+                        st.session_state['pose_buffer'][track_id].append(current_pose)
+
+                        # 30프레임
+                        if len(st.session_state['pose_buffer'][track_id]) > 30:
+                            st.session_state['pose_buffer'][track_id].pop(0)
+
 
                         # 2. 예측 및 판단
-                        if len(st.session_state['pose_buffer']) == 30:
+                        if len(st.session_state['pose_buffer'][track_id]) == 30:
                             try:
-                                seq_data = np.concatenate(st.session_state['pose_buffer'])
+                                seq_data = np.concatenate(st.session_state['pose_buffer'][track_id])
                                 cols = [f"v{i}" for i in range(1020)]
                                 inp = pd.DataFrame([seq_data], columns=cols)
 
@@ -255,17 +270,18 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
 
                                 # (3) 위협 조건 체크 (1등이 위협이고, 확률이 설정값 넘어야 함)
                                 if max_idx == 2 and p_threat >= ai_th_val:
-                                    st.session_state['threat_cooldown'] = lock_frames
+                                    st.session_state['threat_cooldown'][track_id] = lock_frames
+                                    current_timer = lock_frames
 
                                 # (4) 최종 상태 결정 및 텍스트/색상 설정
-                                text_str = ""
-                                text_color = (0, 255, 0)  # 기본 초록 (Safe)
-                                is_threat_now = False
+                                if current_timer > 0:
+                                    text_str = "THREAT (LOCKED)"
+                                    text_color = (255, 0, 0)
+                                    is_threat_now = False
 
                                 # [상태 1] 위협 (현재 감지됨 or 쿨타임 중)
-                                if st.session_state.get('threat_cooldown', 0) > 0:
+                                if st.session_state['threat_cooldown'].get(track_id, 0) > 0:
                                     is_threat_now = True
-                                    # 시간 감소 코드 삭제함 (맨 아래에서 한 번만 처리)
                                     text_str = "THREAT (LOCKED)"
                                     text_color = (255, 0, 0)
 
@@ -274,13 +290,8 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
                                     text_str = f"Move ({p_move * 100:.0f}%)"
                                     text_color = (255, 255, 0)  # 노란색
 
-                                # [상태 3] 안전 (Safe가 1등이거나, Threat이 1등인데 기준 미달일 때)
                                 else:
-                                    # Threat이 1등인데 기준 미달인 경우 -> Safe로 표시하되 확률은 보여줌 (사용자 확인용)
-                                    if max_idx == 2:
-                                        text_str = f"Safe (Low Threat {p_threat * 100:.0f}%)"
-                                    else:
-                                        text_str = f"Safe ({p_safe * 100:.0f}%)"
+                                    text_str = f"Safe ({p_safe * 100:.0f}%)"
                                     text_color = (0, 255, 0)  # 초록색
 
                                 # (5) 화면 표시
@@ -349,7 +360,7 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
                     if not is_low:
                         if in_d and is_reach:
                             p_danger = True
-                            st.session_state['threat_cooldown'] = lock_frames
+                            st.session_state['threat_cooldown'][track_id] = lock_frames
 
                         elif in_w and is_reach:
                             p_warning = True
@@ -364,11 +375,11 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
 
             # 현재 남은 쿨타임 확인
             is_locked_threat = False
-            if st.session_state.get('threat_cooldown', 0) > 0:
+            if current_timer > 0:
                 is_locked_threat = True
-                # [수정] 무한대(90000 이상)가 아닐 때만 시간 감소
-                if st.session_state['threat_cooldown'] < 90000:
-                    st.session_state['threat_cooldown'] -= 1
+                # [수정] 무한 아니면 감지된 객체 시간만 감소
+                if not is_infinite_mode:
+                    st.session_state['threat_cooldown'][track_id] -= 1
 
             # 전체 상태 플래그 업데이트
             if p_danger or is_locked_threat:
@@ -377,25 +388,38 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
                 global_is_warning = True
             if is_fall: global_is_fall = True
 
+            # 결과 리스트에 담기 (view 대시보드용)
+            status_code = "Safe"
+            if p_danger or is_locked_threat: status_code = "Threat"
+            elif p_warning: status_code = "Reach"
+            elif 'max_idx' in locals() and max_idx == 1: status_code = "Move"
+
+            ai_result_list.append({
+                "id": track_id,
+                "status": status_code,
+                "threat": p_threat if 'p_threat' in locals() else 0,
+                "is_locked": is_locked_threat
+            })
+
             # 박스 그리기 여부 결정
             draw_box = True
-            if vis['alert_only'] and not (global_is_danger or global_is_warning or is_fall):
+            if vis['alert_only'] and not (global_is_danger or is_locked_threat or global_is_warning or is_fall):
                 draw_box = False
 
             if draw_box:
                 # 색상 및 텍스트 우선순위 결정
                 # 1순위: 낙상
                 if is_fall:
-                    c, txt = (255, 0, 255), "FALL"
+                    c, txt = (255, 0, 255), f"FALL {track_id}"
                 # 2순위: 위협 (현재 감지됨 OR 락 걸림) -> 무조건 빨강/THREAT
                 elif p_danger or is_locked_threat:
-                    c, txt = (255, 0, 0), "THREAT"
+                    c, txt = (255, 0, 0), f"THREAT {track_id}"
                     # 3순위: 접근 경고
                 elif p_warning:
-                    c, txt = (255, 165, 0), "REACH"
+                    c, txt = (255, 165, 0), f"REACH {track_id}"
                 # 4순위: 안전
                 else:
-                    c, txt = (0, 255, 0), "Safe"
+                    c, txt = (0, 255, 0), f"Safe {track_id}"
 
                 # 실제 그리기
                 if vis['bbox']: cv2.rectangle(image, (int(bx1), int(by1)), (int(bx2), int(by2)), c, 2)

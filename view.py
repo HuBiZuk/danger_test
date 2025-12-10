@@ -41,7 +41,7 @@ def render_sidebar():
                 f.write(upload_file.getbuffer())
             st.success("업로드 완료")
             time.sleep(1)
-            st.experimental_rerun()
+            st.rerun()
 
         # -----------------------
         # AI 모델 선택 박스
@@ -229,7 +229,7 @@ def render_zone_tab(sel_v, curr_settings, video_path):
         st.session_state["draw_mode_state"] = "transform"
         st.session_state["cv_key"] += 1
 
-        st.experimental_rerun()
+        st.rerun()
 
     # ===============================================================
     # 구역 목록 (삭제 및 활성/비활성)
@@ -319,12 +319,19 @@ def render_sensitivity_tab(sel_v, curr_settings):
     is_infinite_lock = st.checkbox("♾️ 제한없음(지속)", value=is_inf_check) # 무제한체크박스
 
     if is_infinite_lock: # 제한 없음 체크시 큰수로 지정
-        st.slider("유지 시간(초)", 0, 300, 30, disabled=True, key="lock_dis")
+        st.slider("유지 시간(초)", 0, 180, 30, disabled=True, key="lock_dis")
         lock_duration = 99999  # 언젠간 풀리겠지
 
     else:   # 체크 해제시 30으로 초기화
         default_val = 30 if saved_lock >= 99999 else saved_lock
-        lock_duration = st.slider("유지시간 (초)",0, 300, default_val)
+        lock_duration = st.slider("위협 감지 락(Lock) 유지시간(초)",
+                                  min_value=0.5,
+                                  max_value=180.0,
+                                  value=curr_settings.get("lock_duration", 0.5),
+                                  step=0.5,
+                                  key="live_lock_duration"
+                                  )
+
 
     if st.button("감도 저장"):
         curr_settings.update({

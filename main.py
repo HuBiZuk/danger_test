@@ -35,6 +35,23 @@ if sel_v == "실시간 카메라":
     video_path = 0
 else:
     video_path = os.path.join("videos", sel_v)
+
+# ===============================================
+# 영상 변경 감지 및 초기화
+if 'last_video_path' not in st.session_state:
+    st.session_state['last_video_path'] = None
+
+# 영상이 바뀌먼 상태 초기화
+if st.session_state['last_video_path'] != video_path:
+    if 'pose_buffer' in st.session_state:
+        st.session_state['pose_buffer'] = {} # 사람별 데이터 버퍼 초기화
+
+    if 'threat_cooldown' in st.session_state:
+        st.session_state['threat_cooldown'] = {} # 빨간 객체박스 쿨타임 초기화
+
+    st.session_state['last_video_path'] = video_path
+#========================================================
+
 curr_settings = utils.load_settings(sel_v)
 
 # 5. 메인 레이아웃 (좌우 분할)
@@ -116,6 +133,7 @@ with right_col:
     live_settings['fall_check'] = st.session_state.get('fall_check', curr_settings.get("fall_check", True))
     live_settings['fall_ratio'] = st.session_state.get('fr', curr_settings.get("fall_ratio", 1.2))
     live_settings['ai_threshold'] = st.session_state.get('ai_th', curr_settings.get("ai_threshold", 0.7))
+    live_settings['lock_duration'] = st.session_state.get('live_lock_duration', curr_settings.get("lock_duration", 0.5))
 
 
 
