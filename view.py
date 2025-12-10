@@ -361,3 +361,12 @@ def render_vis_tab(sel_v, curr_settings):
         st.success("저장됨")
 
     return c_alert, c_sk, c_zn, c_bb, c_dot, c_txt
+
+def  draw_ai_dashborad(ai_result):
+    if ai_result and ai_result["is_active"]:
+        st.markdown("### 📊 AI 실시간 분석")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Safe", f"{ai_result['safe']*100:.1f}%")
+        c2.metric("Move", f"{ai_result['move']*100:.1f}%")
+        t_val = ai_result['threat'] * 100
+        c3.metric("Threat", f"{t_val:.0f}%", delta="위험" if t_val > 50 else "안전", delta_color="inverse")

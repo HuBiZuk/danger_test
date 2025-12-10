@@ -95,6 +95,7 @@ with right_col:
 
 
     st_screen = st.empty()
+    st_status_box = st.empty()
 
     # 실시간 설정을 반영하기 위한 딕셔너리 구성
     live_settings = curr_settings.copy()
@@ -141,8 +142,13 @@ with right_col:
                 continue
 
             # processor 모듈에 위임
-            out_img = processor.process_frame(frame, yolo_model, custom_model, fire_model, live_settings)
+            out_img,ai_result = processor.process_frame(frame, yolo_model, custom_model, fire_model, live_settings)
             st_screen.image(out_img, channels="RGB")
+
+            # 통계용 공간(st.status)에 뷰파일 함수 호출
+            with st_status_box.container():
+                view.draw_ai_dashborad(ai_result)
+
 
             time.sleep(0.01)  # CPU 점유율 조절
     else:
@@ -150,8 +156,11 @@ with right_col:
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
         ret, frame = cap.read()
         if ret:
-            out_img = processor.process_frame(frame, yolo_model, custom_model, fire_model, live_settings)
+            out_img, ai_result = processor.process_frame(frame, yolo_model, custom_model, fire_model, live_settings)
             st_screen.image(out_img, channels="RGB")
+
+            with st_status_box.container():
+                view.draw_ai_dashborad(ai_result)
 
     cap.release()
 

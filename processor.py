@@ -69,6 +69,7 @@ def get_models(model_name='yolov8n-pose.pt'):
 
 
 def process_frame(frame, yolo_model, custom_model, fire_model, settings):
+    ai_result = {"is_active": False, "safe": 0.0, "move": 0.0, "threat": 0.0}
     device = get_device()
     frame = cv2.resize(frame, (640, 480))
     h, w, _ = frame.shape
@@ -216,6 +217,7 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
                         # 1. 비율 데이터 추출 (34 features)
                         current_pose = get_norm_xy(kps)
                         if 'pose_buffer' not in st.session_state: st.session_state['pose_buffer'] = []
+                        st.session_state['pose_buffer'].append(current_pose)
 
                         if len(st.session_state['pose_buffer']) > 30:
                             st.session_state['pose_buffer'].pop(0)
@@ -233,6 +235,11 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
                                 p_move = probs[1] if len(probs) > 1 else 0
                                 p_threat = probs[2] if len(probs) > 2 else 0
 
+                                ai_result["is_active"] = True
+                                ai_result["safe"] = float(p_safe)
+                                ai_result["move"] = float(p_move)
+                                ai_result["threat"] = float(p_threat)
+
                                 # (2) 1등 라벨 확인
                                 max_idx = np.argmax(probs)  # 0:Safe, 1:Move, 2:Threat
 
@@ -241,7 +248,7 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
 
                                 # (3) 위협 조건 체크 (1등이 위협이고, 확률이 설정값 넘어야 함)
                                 if max_idx == 2 and p_threat >= ai_th_val:
-                                    st.session_state['threat_cooldown'] = 60  # 2초 락
+                                    st.session_state['threat_cooldown'] = 30  # 30초당 1초 락유지
 
                                 # (4) 최종 상태 결정 및 텍스트/색상 설정
                                 text_str = ""
@@ -253,12 +260,12 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
                                     is_threat_now = True
                                     st.session_state['threat_cooldown'] -= 1
                                     text_str = f"THREAT ({p_threat * 100:.0f}%)"
-                                    text_color = (0, 0, 255)  # 빨간색
+                                    text_color = (255, 0, 0)  # 빨간색
 
                                 # [상태 2] 이동 (Move가 1등일 때)
                                 elif max_idx == 1:
                                     text_str = f"Move ({p_move * 100:.0f}%)"
-                                    text_color = (0, 255, 255)  # 노란색 (BGR 기준: Blue=0, G=255, R=255)
+                                    text_color = (255, 255, 0)  # 노란색
 
                                 # [상태 3] 안전 (Safe가 1등이거나, Threat이 1등인데 기준 미달일 때)
                                 else:
@@ -384,4 +391,4 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
     cv2.rectangle(image, (0, 0), (w, 40), bar, -1)
     cv2.putText(image, msg, (15, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
 
-    return image
+    return image, ai_result
