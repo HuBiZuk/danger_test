@@ -23,7 +23,7 @@
                     0.4111111111111111
                 ]
             ],
-            "active": true
+            "active": false
         }
     ],
     "fire_check": false,
@@ -43,5 +43,5 @@
         "wrist_dot": true,
         "text": true
     },
-    "ai_threshold": 0.2
+    "ai_threshold": 0.6
 }

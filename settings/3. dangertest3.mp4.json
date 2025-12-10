@@ -180,7 +180,7 @@
     "angle_threshold": 100,
     "hip_ratio": 0.45,
     "extension_threshold": 0.6,
-    "detection_mode": "Algorithm",
+    "detection_mode": "AI",
     "vis_options": {
         "alert_only": true,
         "bbox": true,
@@ -191,7 +191,7 @@
         "text": true
     },
     "fire_check": false,
-    "fall_check": true,
+    "fall_check": false,
     "fall_ratio": 1.2,
-    "ai_threshold": 0.7
+    "ai_threshold": 0.6
 }

@@ -30,7 +30,7 @@
     "extension_threshold": 0.85,
     "angle_threshold": 130,
     "hip_ratio": 0.2,
-    "detection_mode": "OR",
+    "detection_mode": "AI",
     "vis_options": {
         "alert_only": false,
         "skeleton": true,
@@ -40,5 +40,8 @@
         "wrist_dot": true,
         "text": false
     },
-    "fire_check": false
+    "fire_check": false,
+    "fall_check": false,
+    "fall_ratio": 1.2,
+    "ai_threshold": 0.6
 }

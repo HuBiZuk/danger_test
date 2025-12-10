@@ -8,7 +8,8 @@ import numpy as np
 from PIL import Image
 from streamlit_drawable_canvas import st_canvas
 from utils import save_settings, load_settings
-
+import pandas as pd
+import altair as alt
 
 # ===============================================================
 # ① 단일 삭제 콜백 (key 충돌 제거, UI 즉시 반영)
@@ -362,11 +363,52 @@ def render_vis_tab(sel_v, curr_settings):
 
     return c_alert, c_sk, c_zn, c_bb, c_dot, c_txt
 
-def  draw_ai_dashborad(ai_result):
-    if ai_result and ai_result["is_active"]:
+def  draw_ai_dashboard(location, ai_result):
+    if location is None or not ai_result:
+        return
+
+    with location.container():
         st.markdown("### 📊 AI 실시간 분석")
+
+        # 값 가져오기
+        safe =ai_result['safe']
+        move = ai_result['move']
+        threat = ai_result['threat']
+
+        # 최대값 상태 찾기
+        state_idx = np.argmax([safe, move, threat])
+
+        # 최대값에 delta 달기
+        if state_idx == 0:
+            # 초록색 박스 안에 큰 글씨
+            st.success(f"## 🟢 상태 양호 (Safe: {safe*100:.0f}%)")
+        elif state_idx == 1:
+            # 노란색 박스 안에 큰 글씨
+            st.warning(f"## ⚠️ 동작 감지 (Move: {move*100:.0f}%)")
+        else:
+            # 빨간색 박스 안에 큰 글씨
+            st.error(f"## 🚨 위협 발생! (Threat: {threat*100:.0f}%)")
+
+        # 화면에 출력
         c1, c2, c3 = st.columns(3)
-        c1.metric("Safe", f"{ai_result['safe']*100:.1f}%")
-        c2.metric("Move", f"{ai_result['move']*100:.1f}%")
-        t_val = ai_result['threat'] * 100
-        c3.metric("Threat", f"{t_val:.0f}%", delta="위험" if t_val > 50 else "안전", delta_color="inverse")
+        c1.metric("Safe", f"{safe*100:.1f}%")
+        c2.metric("move", f"{move*100:.1f}%")
+        c3.metric("Threat", f"{threat*100:.1f}%")
+
+        # 가로 막대 그래프
+        chart_data = pd.DataFrame({
+            '상태': ['Safe', 'Move', 'Threat'],
+            '확률': [safe, move, threat],
+            '색상': ['#00FF00', '#FFFF00', '#FF0000']
+        })
+
+        c = alt.Chart(chart_data).mark_bar().encode(
+            x=alt.X('확률', scale=alt.Scale(domain=[0, 1])), # 0~100% 고정
+            y=alt.Y('상태', sort=['Safe', 'Move', 'Threat']), # 순서 고정
+            color=alt.Color('색상', scale=None), # 지정된 색상 사용
+            tooltip=['상태', alt.Tooltip('확률', format='.1%')]
+        ).properties(
+            height=200 # 그래프 높이
+        )
+
+        st.altair_chart(c, use_container_width=True)

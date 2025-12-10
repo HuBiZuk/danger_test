@@ -10,6 +10,8 @@ import utils
 import processor
 import view
 
+
+
 # 1. 초기화 및 설정
 st.set_page_config(layout="wide", page_title="AI 전시품 보호 시스템 v3")
 utils.init_directories()
@@ -43,13 +45,16 @@ with left_col:
     # st.tabs는 Streamlit 1.22.0에서 지원되지 않습니다. st.radio로 대체합니다.
     selected_tab = st.radio(
         "설정 탭 선택",
-        ["📝 구역 관리", "⚡ 감도 설정", "👁️ 시각화 설정"],
+        ["📝 구역 관리", "⚡ 감도 설정", "👁️ 시각화 설정", "📊 실시간 AI 분석"],
         key="main_tabs",
-        horizontal=True # 탭처럼 보이게 하기 위해 가로 정렬
+        horizontal=True # 가로 정렬
     )
+    # 그릴공간 변수 초기화
+    ai_dashboard_loc = None
 
     if selected_tab == "📝 구역 관리":
         view.render_zone_tab(sel_v, curr_settings, video_path)
+
     elif selected_tab == "⚡ 감도 설정":
         wd, et, at, md, hr, fire_check, fall_check, fr, ai_th = view.render_sensitivity_tab(sel_v, curr_settings)
         st.session_state['wd'] = wd
@@ -62,7 +67,6 @@ with left_col:
         st.session_state['fr'] = fr
         st.session_state['ai_th'] = ai_th  # 👈 [추가] 세션에 저장
 
-
     elif selected_tab == "👁️ 시각화 설정":
         # render_vis_tab에서 리턴값을 받아야 함
         check_alert, v_skel, v_zone, v_box, v_dot, v_txt = view.render_vis_tab(sel_v, curr_settings)
@@ -72,6 +76,9 @@ with left_col:
         st.session_state['v_box'] = v_box
         st.session_state['v_dot'] = v_dot
         st.session_state['v_txt'] = v_txt
+
+    elif selected_tab == "📊 실시간 AI 분석":
+        ai_dashboard_loc = st.empty()
 
 
 # --- [오른쪽] 모니터링 화면 ---
@@ -145,22 +152,23 @@ with right_col:
             out_img,ai_result = processor.process_frame(frame, yolo_model, custom_model, fire_model, live_settings)
             st_screen.image(out_img, channels="RGB")
 
-            # 통계용 공간(st.status)에 뷰파일 함수 호출
-            with st_status_box.container():
-                view.draw_ai_dashborad(ai_result)
-
+            # 왼쪽 탭에 AI 대시보드 그리기
+            if ai_dashboard_loc is not None:
+                view.draw_ai_dashboard(ai_dashboard_loc, ai_result)
 
             time.sleep(0.01)  # CPU 점유율 조절
     else:
         # 일시 정지 상태
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
         ret, frame = cap.read()
+
         if ret:
             out_img, ai_result = processor.process_frame(frame, yolo_model, custom_model, fire_model, live_settings)
             st_screen.image(out_img, channels="RGB")
 
-            with st_status_box.container():
-                view.draw_ai_dashborad(ai_result)
+            # AI 대시보드 그리기
+            if ai_dashboard_loc is not None:
+                view.draw_ai_dashboard(ai_dashboard_loc, ai_result)
 
     cap.release()
 
