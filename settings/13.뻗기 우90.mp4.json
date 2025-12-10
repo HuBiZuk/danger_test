@@ -43,5 +43,6 @@
         "wrist_dot": true,
         "text": true
     },
-    "ai_threshold": 0.6
+    "ai_threshold": 0.6,
+    "lock_duration": 2
 }

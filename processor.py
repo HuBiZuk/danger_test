@@ -82,6 +82,13 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
     ext_th = settings['extension_threshold']
     mode = settings['detection_mode']
     vis = settings['vis_options']
+    lock_duration = settings.get('lock_duration', 30)
+
+    # 락 프레임 계산 30프레임 = 1초
+    if lock_duration > 1000:
+        lock_frames = lock_duration
+    else:
+        lock_frames = lock_duration * 30
 
     # -----------------------------------------
     # 🔥 화재/연기 감지 로직 (기존 유지)
@@ -248,7 +255,7 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
 
                                 # (3) 위협 조건 체크 (1등이 위협이고, 확률이 설정값 넘어야 함)
                                 if max_idx == 2 and p_threat >= ai_th_val:
-                                    st.session_state['threat_cooldown'] = 30  # 30초당 1초 락유지
+                                    st.session_state['threat_cooldown'] = lock_frames
 
                                 # (4) 최종 상태 결정 및 텍스트/색상 설정
                                 text_str = ""
@@ -256,11 +263,11 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
                                 is_threat_now = False
 
                                 # [상태 1] 위협 (현재 감지됨 or 쿨타임 중)
-                                if st.session_state['threat_cooldown'] > 0:
+                                if st.session_state.get('threat_cooldown', 0) > 0:
                                     is_threat_now = True
-                                    st.session_state['threat_cooldown'] -= 1
-                                    text_str = f"THREAT ({p_threat * 100:.0f}%)"
-                                    text_color = (255, 0, 0)  # 빨간색
+                                    # 시간 감소 코드 삭제함 (맨 아래에서 한 번만 처리)
+                                    text_str = "THREAT (LOCKED)"
+                                    text_color = (255, 0, 0)
 
                                 # [상태 2] 이동 (Move가 1등일 때)
                                 elif max_idx == 1:
@@ -342,33 +349,59 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
                     if not is_low:
                         if in_d and is_reach:
                             p_danger = True
+                            st.session_state['threat_cooldown'] = lock_frames
+
                         elif in_w and is_reach:
                             p_warning = True
 
                     wrist_points.append(
                         {'x': wx, 'y': wy, 'state': 'D' if in_d else ('W' if in_w and is_reach else 'S')})
 
-            # 전체 상태 플래그
-            if p_danger: global_is_danger = True
-            if p_warning: global_is_warning = True
+
+            #==========================================
+            # 최종 상태 판단 및 박스 그리기 로직
+            #------------------------------------------
+
+            # 현재 남은 쿨타임 확인
+            is_locked_threat = False
+            if st.session_state.get('threat_cooldown', 0) > 0:
+                is_locked_threat = True
+                # [수정] 무한대(90000 이상)가 아닐 때만 시간 감소
+                if st.session_state['threat_cooldown'] < 90000:
+                    st.session_state['threat_cooldown'] -= 1
+
+            # 전체 상태 플래그 업데이트
+            if p_danger or is_locked_threat:
+                global_is_danger = True
+            elif p_warning:
+                global_is_warning = True
             if is_fall: global_is_fall = True
 
-            # 결과 그리기
+            # 박스 그리기 여부 결정
             draw_box = True
-            if vis['alert_only'] and not (p_danger or p_warning or is_fall): draw_box = False
+            if vis['alert_only'] and not (global_is_danger or global_is_warning or is_fall):
+                draw_box = False
 
             if draw_box:
+                # 색상 및 텍스트 우선순위 결정
+                # 1순위: 낙상
                 if is_fall:
                     c, txt = (255, 0, 255), "FALL"
-                elif p_danger:
-                    c, txt = (255, 0, 0), "TOUCH"
+                # 2순위: 위협 (현재 감지됨 OR 락 걸림) -> 무조건 빨강/THREAT
+                elif p_danger or is_locked_threat:
+                    c, txt = (255, 0, 0), "THREAT"
+                    # 3순위: 접근 경고
                 elif p_warning:
                     c, txt = (255, 165, 0), "REACH"
+                # 4순위: 안전
                 else:
                     c, txt = (0, 255, 0), "Safe"
 
+                # 실제 그리기
                 if vis['bbox']: cv2.rectangle(image, (int(bx1), int(by1)), (int(bx2), int(by2)), c, 2)
                 if vis['label']: cv2.putText(image, txt, (int(bx1), int(by1) - 5), 1, 1.5, c, 2)
+
+                # 손목 점 그리기
                 if vis['wrist_dot']:
                     for wp in wrist_points:
                         wc = (0, 255, 0)
@@ -377,6 +410,8 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
                         elif wp['state'] == 'W':
                             wc = (255, 165, 0)
                         cv2.circle(image, (wp['x'], wp['y']), 6, wc, -1)
+
+
 
     # 상단 상태바
     if global_is_fall:

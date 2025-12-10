@@ -7,6 +7,8 @@ import os
 import numpy as np
 from PIL import Image
 from streamlit_drawable_canvas import st_canvas
+from sympy.assumptions.wrapper import is_infinite
+
 from utils import save_settings, load_settings
 import pandas as pd
 import altair as alt
@@ -304,11 +306,25 @@ def render_sensitivity_tab(sel_v, curr_settings):
                    disabled=not fall_check)
 
     st.markdown("---")
-
     # [신규] AI 민감도 슬라이더
     st.markdown("##### 🧠 AI 민감도 설정")
     ai_th = st.slider("AI 위협 민감도 (낮을수록 예민)", 0.1, 1.0,
                       curr_settings.get("ai_threshold", 0.7), 0.05)
+
+    st.markdown("---")
+
+    st.write("⏱️ ** 위협 감지 락(Lock) 시간설정(초)**")
+    saved_lock = curr_settings.get("lock_duration", 30) # 설정값 불러오기
+    is_inf_check = (saved_lock >= 99999)    # 99999보다 크면 제한없음으로 판단
+    is_infinite_lock = st.checkbox("♾️ 제한없음(지속)", value=is_inf_check) # 무제한체크박스
+
+    if is_infinite_lock: # 제한 없음 체크시 큰수로 지정
+        st.slider("유지 시간(초)", 0, 300, 30, disabled=True, key="lock_dis")
+        lock_duration = 99999  # 언젠간 풀리겠지
+
+    else:   # 체크 해제시 30으로 초기화
+        default_val = 30 if saved_lock >= 99999 else saved_lock
+        lock_duration = st.slider("유지시간 (초)",0, 300, default_val)
 
     if st.button("감도 저장"):
         curr_settings.update({
@@ -320,7 +336,8 @@ def render_sensitivity_tab(sel_v, curr_settings):
             "angle_threshold": at,
             "detection_mode": md,
             "hip_ratio": hr,
-            "ai_threshold": ai_th  # 저장 항목
+            "ai_threshold": ai_th,
+            "lock_duration": lock_duration
         })
         save_settings(sel_v, curr_settings)
         st.success("저장됨")

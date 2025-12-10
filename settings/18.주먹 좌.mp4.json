@@ -33,7 +33,7 @@
     "extension_threshold": 0.85,
     "angle_threshold": 130,
     "hip_ratio": 0.2,
-    "detection_mode": "AI",
+    "detection_mode": "Algorithm",
     "vis_options": {
         "alert_only": false,
         "skeleton": true,
@@ -43,5 +43,6 @@
         "wrist_dot": true,
         "text": true
     },
-    "ai_threshold": 0.45
+    "ai_threshold": 0.55,
+    "lock_duration": 1
 }
