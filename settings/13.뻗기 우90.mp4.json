@@ -27,7 +27,7 @@
         }
     ],
     "fire_check": false,
-    "fall_check": true,
+    "fall_check": false,
     "fall_ratio": 1.2,
     "warning_distance": 14,
     "extension_threshold": 0.85,
@@ -44,5 +44,5 @@
         "text": true
     },
     "ai_threshold": 0.4,
-    "lock_duration": 0.5
+    "lock_duration": 99999
 }

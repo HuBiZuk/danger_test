@@ -30,7 +30,7 @@
     "angle_threshold": 130,
     "hip_ratio": 0.2,
     "extension_threshold": 0.85,
-    "detection_mode": "AI",
+    "detection_mode": "Algorithm",
     "vis_options": {
         "alert_only": false,
         "bbox": true,

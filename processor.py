@@ -247,6 +247,8 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
                         # 2. 예측 및 판단
                         if len(st.session_state['pose_buffer'][track_id]) == 30:
                             try:
+                                is_threat_now = False
+
                                 seq_data = np.concatenate(st.session_state['pose_buffer'][track_id])
                                 cols = [f"v{i}" for i in range(1020)]
                                 inp = pd.DataFrame([seq_data], columns=cols)
@@ -268,39 +270,39 @@ def process_frame(frame, yolo_model, custom_model, fire_model, settings):
                                 # 설정값 가져오기
                                 ai_th_val = settings.get('ai_threshold', 0.7)
 
-                                # (3) 위협 조건 체크 (1등이 위협이고, 확률이 설정값 넘어야 함)
-                                if max_idx == 2 and p_threat >= ai_th_val:
+                                current_lock_timer = st.session_state['threat_cooldown'].get(track_id, 0)   # 쿨타임 상태 확인
+                                is_new_threat = (max_idx == 2 and p_threat >= ai_th_val)    # 새 위협감지 확인
+
+                                if is_new_threat:   # 위협이 감지되면 락 시간 갱신(리셋)
                                     st.session_state['threat_cooldown'][track_id] = lock_frames
                                     current_timer = lock_frames
 
-                                # (4) 최종 상태 결정 및 텍스트/색상 설정
-                                if current_timer > 0:
-                                    text_str = "THREAT (LOCKED)"
-                                    text_color = (255, 0, 0)
-                                    is_threat_now = False
-
-                                # [상태 1] 위협 (현재 감지됨 or 쿨타임 중)
-                                if st.session_state['threat_cooldown'].get(track_id, 0) > 0:
+                                # (3) 최종 상태 결정 및 텍스트/색상 설정
+                                if current_lock_timer > 0:  # 위협 락걸림
                                     is_threat_now = True
                                     text_str = "THREAT (LOCKED)"
                                     text_color = (255, 0, 0)
+                                    is_threat_now = False
+                                    current_timer = current_lock_timer
 
-                                # [상태 2] 이동 (Move가 1등일 때)
-                                elif max_idx == 1:
+
+                                elif max_idx == 1:  #  이동
+                                    is_threat_now = False
                                     text_str = f"Move ({p_move * 100:.0f}%)"
                                     text_color = (255, 255, 0)  # 노란색
 
-                                else:
+                                else:   # 안전
+                                    is_threat_now = False
                                     text_str = f"Safe ({p_safe * 100:.0f}%)"
                                     text_color = (0, 255, 0)  # 초록색
 
-                                # (5) 화면 표시
+                                # (4) 화면 표시
                                 if vis['text']:
                                     # 머리 위 라벨 (기존 유지)
                                     cv2.putText(image, f"AI: {text_str}", (sx, sy - 30),
                                                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, text_color, 2)
 
-                                    # 👇 [수정] 왼쪽 아래 구석으로 이동
+                                    # 왼쪽 하단 대시보드
                                     base_y = h - 120  # 바닥에서 120픽셀 위를 시작점으로 잡음
 
                                     # 검은 배경 박스
